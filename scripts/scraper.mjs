@@ -223,15 +223,15 @@ async function scrapeArticle(url) {
   return { title, body, imageUrl, sourceCategory, sourceUrl: url };
 }
 
-// ─── Watermark detection (specific to laopcion.com) ─────────────────────────
+// ─── Watermark detection (specific to puentelibre.mx) ───────────────────────
 //
 // Strategy:
-//  1. URL check  — if the image is hosted on laopcion.com, skip immediately.
+//  1. URL check  — if the image is hosted on puentelibre.mx, skip immediately.
 //  2. Vision check — ask GPT-4o specifically whether the image shows the
-//     "La Opción" / "laopcion.com" logo or watermark text. Generic watermark
+//     "Puente Libre" / "puentelibre.mx" logo or watermark text. Generic watermark
 //     detection produces too many false positives with other outlets' CDNs.
 
-const BLOCKED_IMAGE_DOMAINS = ['laopcion.com', 'la-opcion.com', 'opcion.com.mx'];
+const BLOCKED_IMAGE_DOMAINS = ['puentelibre.mx', 'puentelibre.com'];
 
 function imageFromBlockedDomain(imageUrl) {
   try {
@@ -242,16 +242,16 @@ function imageFromBlockedDomain(imageUrl) {
   }
 }
 
-async function hasLaOpcionWatermark(imageUrl) {
+async function hasPuenteLibreWatermark(imageUrl) {
   if (!imageUrl) return false;
 
-  // Fast path: image is served directly from laopcion.com CDN
+  // Fast path: image is served directly from puentelibre.mx CDN
   if (imageFromBlockedDomain(imageUrl)) {
-    console.log('     ⚠ Image hosted on laopcion.com — skipping');
+    console.log('     ⚠ Image hosted on puentelibre.mx — skipping');
     return true;
   }
 
-  // Vision check: look ONLY for La Opción branding, not generic watermarks
+  // Vision check: look ONLY for Puente Libre branding, not generic watermarks
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -263,7 +263,7 @@ async function hasLaOpcionWatermark(imageUrl) {
               type: 'text',
               text: [
                 'Look at this image carefully.',
-                'Does it contain a visible watermark, logo, or text that says "La Opción", "laopcion.com", or "opcion.com"?',
+                'Does it contain a visible watermark, logo, or text that says "Puente Libre", "puentelibre.mx", or "puentelibre.com"?',
                 'Answer only YES or NO. Do NOT flag watermarks from other outlets.',
               ].join(' '),
             },
@@ -405,10 +405,10 @@ async function run() {
 
         console.log(`     Title: ${article.title.slice(0, 70)}…`);
 
-        // 2. Watermark check (laopcion.com specific)
-        const watermark = await hasLaOpcionWatermark(article.imageUrl);
+        // 2. Watermark check (puentelibre.mx specific)
+        const watermark = await hasPuenteLibreWatermark(article.imageUrl);
         if (watermark) {
-          console.log('     ✗ La Opción watermark detected — skipping article');
+          console.log('     ✗ Puente Libre watermark detected — skipping article');
           processed.push(url);
           skipped++;
           await sleep(DELAY_MS);
