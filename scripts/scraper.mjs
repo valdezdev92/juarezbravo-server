@@ -445,10 +445,9 @@ async function run() {
 
   console.log(`\n✅ Done — Published: ${published} | Skipped: ${skipped} | Errors: ${errors}\n`);
 
-  // Exit with error code if everything failed (alerts GitHub Actions)
-  if (published === 0 && errors > 0 && skipped === 0) {
-    process.exit(1);
-  }
+  // Force exit — the Base44 SDK keeps sockets open and Node.js won't exit on its own
+  const code = published === 0 && errors > 0 && skipped === 0 ? 1 : 0;
+  process.exit(code);
 }
 
 run().catch((err) => {
