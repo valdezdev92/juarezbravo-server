@@ -2,7 +2,6 @@
 export const CATEGORIES = [
   { slug: "seguridad", name: "Seguridad" },
   { slug: "politica", name: "Política" },
-  { slug: "sociedad", name: "Sociedad" },
   { slug: "deportes", name: "Deportes" },
   { slug: "entretenimiento", name: "Entretenimiento" },
 ];

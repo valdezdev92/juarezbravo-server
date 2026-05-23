@@ -43,7 +43,7 @@ const SECTIONS = [
   { url: `${BASE_URL}/economia/`,     defaultCategory: 'politica' },
 ];
 
-const VALID_CATEGORIES = ['seguridad', 'politica', 'sociedad', 'deportes', 'entretenimiento'];
+const VALID_CATEGORIES = ['seguridad', 'politica', 'deportes', 'entretenimiento'];
 
 const HTTP_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (compatible; JuarezBravoBot/1.0)',
@@ -306,7 +306,7 @@ Responde ÚNICAMENTE en JSON válido con esta estructura exacta:
   "title": "Titular reescrito (máx 120 chars)",
   "excerpt": "Resumen de 2-3 oraciones",
   "body": "Cuerpo completo en HTML usando <p>, <h2>, <h3>, <blockquote>",
-  "category": "una de: seguridad | politica | sociedad | deportes | entretenimiento"
+  "category": "una de: seguridad | politica | deportes | entretenimiento"
 }
 
 ${categoryHint}`,
@@ -324,7 +324,7 @@ ${categoryHint}`,
 
   // Validate category
   if (!VALID_CATEGORIES.includes(parsed.category)) {
-    parsed.category = defaultCategory || 'sociedad';
+    parsed.category = defaultCategory || 'seguridad';
   }
 
   return parsed;
