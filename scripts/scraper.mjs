@@ -1,0 +1,380 @@
+/**
+ * JuarezBravo.com — News Scraper
+ *
+ * Scrapes puentelibre.mx, rewrites content with OpenAI,
+ * checks images for watermarks, and publishes to Base44.
+ */
+
+import { createClient } from '@base44/sdk';
+import OpenAI from 'openai';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// ─── Clients ──────────────────────────────────────────────────────────────────
+
+const base44 = createClient({
+  appId: '6a1108d69522691f54677d57',
+  requiresAuth: false,
+  serverUrl: '',
+});
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+const BASE_URL = 'https://puentelibre.mx';
+const MAX_ARTICLES_PER_SECTION = 3;
+const MAX_PROCESSED_HISTORY = 1000;
+const DELAY_MS = 2500;
+
+// Sections to scrape and their default category mapping
+const SECTIONS = [
+  { url: `${BASE_URL}/local/`,        defaultCategory: null },          // AI decides: seguridad o sociedad
+  { url: `${BASE_URL}/deportes/`,     defaultCategory: 'deportes' },
+  { url: `${BASE_URL}/espectaculos/`, defaultCategory: 'entretenimiento' },
+  { url: `${BASE_URL}/nacional/`,     defaultCategory: 'politica' },
+  { url: `${BASE_URL}/economia/`,     defaultCategory: 'politica' },
+];
+
+const VALID_CATEGORIES = ['seguridad', 'politica', 'sociedad', 'deportes', 'entretenimiento'];
+
+const HTTP_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; JuarezBravoBot/1.0)',
+  'Accept-Language': 'es-MX,es;q=0.9',
+};
+
+// ─── State (processed URLs) ────────────────────────────────────────────────────
+
+const PROCESSED_FILE = join(__dirname, 'processed.json');
+
+function getProcessed() {
+  if (!existsSync(PROCESSED_FILE)) return [];
+  try {
+    return JSON.parse(readFileSync(PROCESSED_FILE, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function saveProcessed(urls) {
+  // Keep only the last N to avoid the file growing indefinitely
+  const trimmed = urls.slice(-MAX_PROCESSED_HISTORY);
+  writeFileSync(PROCESSED_FILE, JSON.stringify(trimmed, null, 2));
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function slugify(text) {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 80);
+}
+
+function uniqueSlug(title) {
+  const base = slugify(title);
+  const suffix = Date.now().toString(36);
+  return `${base}-${suffix}`;
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function sectionSlug(sectionUrl) {
+  return sectionUrl.replace(BASE_URL, '').replace(/\//g, '') || 'local';
+}
+
+// ─── Scraping ─────────────────────────────────────────────────────────────────
+
+async function getArticleLinks(sectionUrl) {
+  const { data } = await axios.get(sectionUrl, {
+    headers: HTTP_HEADERS,
+    timeout: 20_000,
+  });
+
+  const $ = cheerio.load(data);
+  const seen = new Set();
+  const links = [];
+
+  // Try multiple selectors to find article links
+  const selectors = [
+    'article a[href]',
+    '.entry-title a[href]',
+    'h2 a[href]',
+    'h3 a[href]',
+    '.post-title a[href]',
+    '.td-module-title a[href]',
+  ];
+
+  for (const sel of selectors) {
+    $(sel).each((_, el) => {
+      let href = $(el).attr('href') || '';
+      if (!href.startsWith('http')) href = `${BASE_URL}${href}`;
+      // Only include deep article URLs from the same domain
+      if (
+        href.includes('puentelibre.mx') &&
+        href.split('/').length >= 5 &&
+        !seen.has(href)
+      ) {
+        seen.add(href);
+        links.push(href);
+      }
+    });
+  }
+
+  return links.slice(0, MAX_ARTICLES_PER_SECTION);
+}
+
+async function scrapeArticle(url) {
+  const { data } = await axios.get(url, {
+    headers: HTTP_HEADERS,
+    timeout: 20_000,
+  });
+
+  const $ = cheerio.load(data);
+
+  // Title — try h1 first, then h2
+  const title =
+    $('h1.entry-title, h1.post-title, h1').first().text().trim() ||
+    $('h2.entry-title, h2').first().text().trim();
+
+  // Body — collect paragraphs from the article content area
+  const bodyParts = [];
+  $(
+    'article .entry-content p, article .post-content p, .entry-content p, .post-body p'
+  ).each((_, el) => {
+    const text = $(el).text().trim();
+    if (text.length > 30) bodyParts.push(text);
+  });
+  const body = bodyParts.join('\n\n');
+
+  // Image — prefer the featured/lead image
+  const imageUrl =
+    $('article .entry-content img, .post-thumbnail img, figure img')
+      .first()
+      .attr('src') ||
+    $('meta[property="og:image"]').attr('content') ||
+    '';
+
+  // Category from URL path segment
+  const match = url.match(/puentelibre\.mx\/([^/]+)\//);
+  const sourceCategory = match?.[1] || 'local';
+
+  return { title, body, imageUrl: imageUrl || '', sourceCategory, sourceUrl: url };
+}
+
+// ─── OpenAI — Watermark detection ────────────────────────────────────────────
+
+async function hasWatermark(imageUrl) {
+  if (!imageUrl) return false;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Does this image contain a visible watermark, logo overlay, or text branding from a news outlet or company? Answer only YES or NO.',
+            },
+            {
+              type: 'image_url',
+              image_url: { url: imageUrl, detail: 'low' },
+            },
+          ],
+        },
+      ],
+      max_tokens: 5,
+    });
+
+    const answer = response.choices[0]?.message?.content?.trim().toUpperCase() ?? 'NO';
+    return answer.startsWith('YES');
+  } catch (err) {
+    console.warn(`  ⚠ Watermark check failed (${err.message}) — assuming no watermark`);
+    return false;
+  }
+}
+
+// ─── OpenAI — Article rewriting ───────────────────────────────────────────────
+
+async function rewriteArticle(title, body, sourceCategory, defaultCategory) {
+  const categoryHint = defaultCategory
+    ? `La categoría de origen es "${sourceCategory}", mapéala a: ${defaultCategory}.`
+    : `La categoría de origen es "${sourceCategory}" (noticias locales de Juárez). Elige la categoría más apropiada.`;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'system',
+        content: `Eres editor de JuarezBravo.com, portal de noticias de Ciudad Juárez, México.
+Tu tarea: reescribir artículos con palabras distintas preservando todos los datos, hechos y cifras.
+Usa tono periodístico profesional en español mexicano.
+
+Responde ÚNICAMENTE en JSON válido con esta estructura exacta:
+{
+  "title": "Titular reescrito (máx 120 chars)",
+  "excerpt": "Resumen de 2-3 oraciones",
+  "body": "Cuerpo completo en HTML usando <p>, <h2>, <h3>, <blockquote>",
+  "category": "una de: seguridad | politica | sociedad | deportes | entretenimiento"
+}
+
+${categoryHint}`,
+      },
+      {
+        role: 'user',
+        content: `Título original: ${title}\n\nContenido:\n${body.slice(0, 4000)}`,
+      },
+    ],
+    max_tokens: 1800,
+    response_format: { type: 'json_object' },
+  });
+
+  const parsed = JSON.parse(response.choices[0].message.content);
+
+  // Validate category
+  if (!VALID_CATEGORIES.includes(parsed.category)) {
+    parsed.category = defaultCategory || 'sociedad';
+  }
+
+  return parsed;
+}
+
+// ─── Base44 — Publishing ──────────────────────────────────────────────────────
+
+async function publishArticle(rewritten, imageUrl) {
+  const slug = uniqueSlug(rewritten.title);
+
+  await base44.entities.Article.create({
+    title: rewritten.title,
+    slug,
+    excerpt: rewritten.excerpt,
+    body: rewritten.body,
+    cover_image: imageUrl,
+    category: rewritten.category,
+    status: 'published',
+    published_at: new Date().toISOString(),
+    is_breaking_news: false,
+    is_featured: false,
+    author: 'Redacción JuarezBravo',
+    views: 0,
+    tags: [],
+  });
+
+  return slug;
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+async function run() {
+  console.log(`\n🗞  JuarezBravo Scraper — ${new Date().toISOString()}\n`);
+
+  const processed = getProcessed();
+  let published = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const section of SECTIONS) {
+    console.log(`📂 Section: ${section.url}`);
+
+    let links;
+    try {
+      links = await getArticleLinks(section.url);
+      console.log(`   Found ${links.length} article(s)`);
+    } catch (err) {
+      console.error(`   ✗ Failed to fetch section: ${err.message}`);
+      errors++;
+      continue;
+    }
+
+    for (const url of links) {
+      if (processed.includes(url)) {
+        console.log(`   ⤷ Already processed: ${url}`);
+        continue;
+      }
+
+      console.log(`\n   ↳ ${url}`);
+
+      try {
+        // 1. Scrape
+        const article = await scrapeArticle(url);
+
+        if (!article.title) {
+          console.log('     ✗ No title found — skipping');
+          processed.push(url);
+          skipped++;
+          continue;
+        }
+
+        if (article.body.length < 80) {
+          console.log('     ✗ Insufficient body content — skipping');
+          processed.push(url);
+          skipped++;
+          continue;
+        }
+
+        console.log(`     Title: ${article.title.slice(0, 70)}…`);
+
+        // 2. Watermark check
+        const watermark = await hasWatermark(article.imageUrl);
+        if (watermark) {
+          console.log('     ✗ Watermark detected — skipping article');
+          processed.push(url);
+          skipped++;
+          await sleep(DELAY_MS);
+          continue;
+        }
+
+        // 3. Rewrite with OpenAI
+        const rewritten = await rewriteArticle(
+          article.title,
+          article.body,
+          article.sourceCategory,
+          section.defaultCategory
+        );
+        console.log(`     ✓ Rewritten → [${rewritten.category}] ${rewritten.title.slice(0, 60)}…`);
+
+        // 4. Publish to Base44
+        const slug = await publishArticle(rewritten, article.imageUrl);
+        console.log(`     ✓ Published: /noticias/${slug}`);
+
+        processed.push(url);
+        published++;
+      } catch (err) {
+        console.error(`     ✗ Error: ${err.message}`);
+        // Still mark as processed to avoid retrying a permanently broken URL
+        processed.push(url);
+        errors++;
+      }
+
+      await sleep(DELAY_MS);
+    }
+  }
+
+  saveProcessed(processed);
+
+  console.log(`\n✅ Done — Published: ${published} | Skipped: ${skipped} | Errors: ${errors}\n`);
+
+  // Exit with error code if everything failed (alerts GitHub Actions)
+  if (published === 0 && errors > 0 && skipped === 0) {
+    process.exit(1);
+  }
+}
+
+run().catch((err) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
