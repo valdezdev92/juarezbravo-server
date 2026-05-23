@@ -364,6 +364,18 @@ async function run() {
   let skipped = 0;
   let errors = 0;
 
+  // Build a set of already-published title slugs from Base44 to prevent duplicates.
+  // This catches cases where the same story appears at different URLs, or where
+  // processed.json was not saved correctly in a previous run.
+  const publishedTitleSlugs = new Set();
+  try {
+    const recent = await base44.entities.Article.list('-published_at', 500);
+    for (const a of recent) publishedTitleSlugs.add(slugify(a.title));
+    console.log(`   ℹ Loaded ${publishedTitleSlugs.size} existing titles for dedup\n`);
+  } catch (err) {
+    console.warn(`  ⚠ Could not fetch existing titles for dedup: ${err.message}\n`);
+  }
+
   for (const section of SECTIONS) {
     console.log(`📂 Section: ${section.url}`);
 
@@ -405,7 +417,17 @@ async function run() {
 
         console.log(`     Title: ${article.title.slice(0, 70)}…`);
 
-        // 2. Watermark check (puentelibre.mx specific)
+        // 2. Duplicate title check — same story at a different URL
+        const titleSlug = slugify(article.title);
+        if (publishedTitleSlugs.has(titleSlug)) {
+          console.log('     ⤷ Duplicate title — already published, skipping');
+          processed.push(url);
+          skipped++;
+          continue;
+        }
+        publishedTitleSlugs.add(titleSlug);
+
+        // 4. Watermark check (puentelibre.mx specific)
         const watermark = await hasPuenteLibreWatermark(article.imageUrl);
         if (watermark) {
           console.log('     ✗ Puente Libre watermark detected — skipping article');
@@ -415,7 +437,7 @@ async function run() {
           continue;
         }
 
-        // 3. Rewrite with OpenAI
+        // 5. Rewrite with OpenAI
         const rewritten = await rewriteArticle(
           article.title,
           article.body,
@@ -424,7 +446,7 @@ async function run() {
         );
         console.log(`     ✓ Rewritten → [${rewritten.category}] ${rewritten.title.slice(0, 60)}…`);
 
-        // 4. Publish to Base44
+        // 6. Publish to Base44
         const slug = await publishArticle(rewritten, article.imageUrl);
         console.log(`     ✓ Published: /noticias/${slug}`);
 
