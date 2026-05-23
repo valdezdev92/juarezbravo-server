@@ -19,8 +19,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const base44 = createClient({
   appId: '6a1108d69522691f54677d57',
-  requiresAuth: false,
-  serverUrl: '',
+  serverUrl: 'https://juarez-bravo-pulse.base44.app',
+  headers: {
+    api_key: process.env.BASE44_API_KEY,
+  },
 });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
