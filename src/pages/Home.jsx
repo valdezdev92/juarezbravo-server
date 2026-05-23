@@ -56,12 +56,20 @@ export default function Home() {
     })),
   });
 
-  const featured   = articles.find((a) => a.is_featured) || articles[0];
-  const pool       = articles.filter((a) => a.id !== featured?.id);
-  const secondary  = pickDiverseSidebar(pool, 4);
-  const shownIds   = new Set([featured?.id, ...secondary.map((a) => a.id)]);
-  const latest     = pool.filter((a) => !shownIds.has(a.id)).slice(0, 18);
-  const breaking   = articles.filter((a) => a.is_breaking_news).slice(0, 4);
+  // Hero = always the single most recently published article (index 0)
+  // "is_featured" is kept for manual editorial override only when
+  // the editor explicitly wants to pin a specific story.
+  const featured  = articles[0];
+
+  // "Último Momento" = the next 4 freshest articles right after the hero
+  // These are the most recently scraped stories, shown as breaking news.
+  const breaking  = articles.slice(1, 5);
+
+  // Sidebar + latest come from the remaining pool
+  const pool      = articles.slice(5);
+  const secondary = pickDiverseSidebar(pool, 4);
+  const shownIds  = new Set(secondary.map((a) => a.id));
+  const latest    = pool.filter((a) => !shownIds.has(a.id)).slice(0, 18);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
@@ -132,10 +140,10 @@ export default function Home() {
         </aside>
       </section>
 
-      {/* ── 2. Breaking news — adaptive columns, hidden when empty ─────────── */}
+      {/* ── 2. Último Momento — los artículos más recientes del scraper ──────── */}
       {breaking.length >= 1 && (
         <section>
-          <SectionHeader title="Último Momento" subtitle="Noticias urgentes en Juárez" />
+          <SectionHeader title="Último Momento" subtitle="Lo más reciente en Ciudad Juárez" />
           <div
             className={`grid gap-4 grid-cols-1 sm:grid-cols-2 ${
               breaking.length >= 3 ? "lg:grid-cols-4" : "lg:grid-cols-2"
