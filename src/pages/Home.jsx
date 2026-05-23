@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { base44 } from "@/api/base44Client";
 import ArticleCard from "@/components/public/ArticleCard";
@@ -8,27 +8,49 @@ import { CATEGORIES } from "@/lib/categories";
 import { Link } from "react-router-dom";
 
 export default function Home() {
+  // Main feed — hero + sidebar + latest grid
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ["articles", "published"],
     queryFn: () =>
-      base44.entities.Article.filter({ status: "published" }, "-published_at", 50),
+      base44.entities.Article.filter({ status: "published" }, "-published_at", 100),
+  });
+
+  // Independent per-category queries so each section always has fresh articles
+  // regardless of how many total articles exist
+  const categoryQueries = useQueries({
+    queries: CATEGORIES.map((cat) => ({
+      queryKey: ["articles", "cat", cat.slug],
+      queryFn: () =>
+        base44.entities.Article.filter(
+          { status: "published", category: cat.slug },
+          "-published_at",
+          4
+        ),
+      staleTime: 5 * 60 * 1000,
+    })),
   });
 
   const featured = articles.find((a) => a.is_featured) || articles[0];
-  const secondary = articles.filter((a) => a.id !== featured?.id).slice(0, 4);
-  const latest = articles.filter((a) => a.id !== featured?.id).slice(4, 13);
+  const rest = articles.filter((a) => a.id !== featured?.id);
+  const secondary = rest.slice(0, 4);
+  const latest = rest.slice(4, 22);
   const breakingHighlight = articles.filter((a) => a.is_breaking_news).slice(0, 4);
 
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="animate-pulse grid lg:grid-cols-3 gap-6">
+        <div className="animate-pulse grid lg:grid-cols-3 gap-6 mb-12">
           <div className="lg:col-span-2 h-[420px] bg-secondary" />
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-20 bg-secondary" />
             ))}
           </div>
+        </div>
+        <div className="animate-pulse grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-64 bg-secondary" />
+          ))}
         </div>
       </div>
     );
@@ -62,7 +84,8 @@ export default function Home() {
         <meta property="og:description" content="Las últimas noticias de Ciudad Juárez: seguridad, política, sociedad, deportes y entretenimiento." />
         <meta property="og:type" content="website" />
       </Helmet>
-      {/* Hero + Sidebar */}
+
+      {/* ── Hero + Sidebar ─────────────────────────────────────────────────── */}
       <section className="grid lg:grid-cols-3 gap-6 mb-12">
         <div className="lg:col-span-2">
           {featured && <ArticleCard article={featured} variant="hero" />}
@@ -73,18 +96,19 @@ export default function Home() {
               Lo más destacado
             </h3>
           </div>
-          {secondary.length === 0 && (
+          {secondary.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
               No hay más noticias aún.
             </p>
+          ) : (
+            secondary.map((article) => (
+              <ArticleCard key={article.id} article={article} variant="compact" />
+            ))
           )}
-          {secondary.map((article) => (
-            <ArticleCard key={article.id} article={article} variant="compact" />
-          ))}
         </aside>
       </section>
 
-      {/* Breaking news strip */}
+      {/* ── Breaking news strip ────────────────────────────────────────────── */}
       {breakingHighlight.length > 0 && (
         <section className="mb-12">
           <SectionHeader title="Último Momento" subtitle="Noticias urgentes en Juárez" />
@@ -96,22 +120,22 @@ export default function Home() {
         </section>
       )}
 
-      {/* Latest news grid */}
-      <section className="mb-12">
-        <SectionHeader title="Últimas Noticias" subtitle="Lo más reciente publicado" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {latest.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
-      </section>
+      {/* ── Latest news grid (up to 18 articles) ──────────────────────────── */}
+      {latest.length > 0 && (
+        <section className="mb-12">
+          <SectionHeader title="Últimas Noticias" subtitle="Lo más reciente publicado" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {latest.map((article) => (
+              <ArticleCard key={article.id} article={article} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* By category */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {CATEGORIES.slice(0, 4).map((cat) => {
-          const catArticles = articles
-            .filter((a) => a.category === cat.slug)
-            .slice(0, 3);
+      {/* ── Category sections — each with its own independent query ───────── */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
+        {CATEGORIES.map((cat, i) => {
+          const catArticles = categoryQueries[i]?.data ?? [];
           if (!catArticles.length) return null;
           return (
             <div key={cat.slug}>
