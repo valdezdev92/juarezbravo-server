@@ -1,0 +1,77 @@
+{
+  "name": "Article",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo del art\u00edculo"
+    },
+    "slug": {
+      "type": "string",
+      "description": "URL slug \u00fanico"
+    },
+    "excerpt": {
+      "type": "string",
+      "description": "Resumen corto del art\u00edculo"
+    },
+    "body": {
+      "type": "string",
+      "description": "Contenido completo HTML del art\u00edculo"
+    },
+    "cover_image": {
+      "type": "string",
+      "description": "URL de la imagen de portada"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "seguridad",
+        "politica",
+        "sociedad",
+        "deportes",
+        "entretenimiento"
+      ],
+      "description": "Categor\u00eda principal"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Etiquetas del art\u00edculo"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published"
+      ],
+      "default": "draft"
+    },
+    "is_breaking_news": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marcar como noticia de \u00faltimo momento"
+    },
+    "is_featured": {
+      "type": "boolean",
+      "default": false,
+      "description": "Mostrar en el hero principal"
+    },
+    "author": {
+      "type": "string",
+      "description": "Nombre del autor"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "views": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "title"
+  ]
+}

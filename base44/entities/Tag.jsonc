@@ -1,0 +1,16 @@
+{
+  "name": "Tag",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "slug"
+  ]
+}
