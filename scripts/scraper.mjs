@@ -107,31 +107,25 @@ async function getArticleLinks(sectionUrl) {
   const seen = new Set();
   const links = [];
 
-  // Try multiple selectors to find article links
-  const selectors = [
-    'article a[href]',
-    '.entry-title a[href]',
-    'h2 a[href]',
-    'h3 a[href]',
-    '.post-title a[href]',
-    '.td-module-title a[href]',
-  ];
+  // Collect every internal link on the page
+  $('a[href]').each((_, el) => {
+    let href = $(el).attr('href') || '';
+    if (!href.startsWith('http')) href = `${BASE_URL}${href}`;
 
-  for (const sel of selectors) {
-    $(sel).each((_, el) => {
-      let href = $(el).attr('href') || '';
-      if (!href.startsWith('http')) href = `${BASE_URL}${href}`;
-      // Only include deep article URLs from the same domain
-      if (
-        href.includes('puentelibre.mx') &&
-        href.split('/').length >= 5 &&
-        !seen.has(href)
-      ) {
-        seen.add(href);
-        links.push(href);
-      }
-    });
-  }
+    if (
+      href.includes('puentelibre.mx') &&
+      // Must be a deep path like /section/article-slug/
+      href.split('/').filter(Boolean).length >= 4 &&
+      // Skip section index pages, tag pages, author pages, pagination
+      !/\/(tag|autor|author|page|categoria|category|\?|#)/.test(href) &&
+      // Skip the /slugnoticia/ duplicate URLs the site generates
+      !href.includes('/slugnoticia/') &&
+      !seen.has(href)
+    ) {
+      seen.add(href);
+      links.push(href);
+    }
+  });
 
   return links.slice(0, MAX_ARTICLES_PER_SECTION);
 }
@@ -144,34 +138,87 @@ async function scrapeArticle(url) {
 
   const $ = cheerio.load(data);
 
-  // Title — try h1 first, then h2
+  // ── Title & Image — extract BEFORE any DOM cleanup ─────────────────────────
+  // Title: h1 anywhere on the page, fallback to og:title meta
   const title =
-    $('h1.entry-title, h1.post-title, h1').first().text().trim() ||
-    $('h2.entry-title, h2').first().text().trim();
-
-  // Body — collect paragraphs from the article content area
-  const bodyParts = [];
-  $(
-    'article .entry-content p, article .post-content p, .entry-content p, .post-body p'
-  ).each((_, el) => {
-    const text = $(el).text().trim();
-    if (text.length > 30) bodyParts.push(text);
-  });
-  const body = bodyParts.join('\n\n');
-
-  // Image — prefer the featured/lead image
-  const imageUrl =
-    $('article .entry-content img, .post-thumbnail img, figure img')
-      .first()
-      .attr('src') ||
-    $('meta[property="og:image"]').attr('content') ||
+    $('h1').first().text().trim() ||
+    $('meta[property="og:title"]').attr('content') ||
+    $('title').text().replace(/\s*[-|].*$/, '').trim() || // strip "Site Name" suffix
     '';
 
-  // Category from URL path segment
+  // Image: prefer og:image (canonical, no crop artifacts), then first real img
+  const ogImage = $('meta[property="og:image"]').attr('content') || '';
+  const firstImg =
+    $('img[src]')
+      .toArray()
+      .map((el) => $(el).attr('src') || '')
+      .find((src) => src.startsWith('http') && /\.(jpe?g|png|webp)/i.test(src)) || '';
+  const imageUrl = ogImage || firstImg;
+
+  // ── Remove noisy elements before body extraction ───────────────────────────
+  // Note: we intentionally keep <article> and its inner <header> since
+  // the site nests the h1 there — but we've already grabbed the title above.
+  $(
+    'nav, header, footer, aside, .sidebar, .widget, .related, ' +
+    '.comments, .comment, script, style, noscript, .social, ' +
+    '.share, .tags, .breadcrumb, .pagination, form, iframe, ' +
+    '.advertisement, .ad, .banner'
+  ).remove();
+
+  // ── Body ──────────────────────────────────────────────────────────────────
+  // Strategy 1: known CMS content wrappers
+  const contentSelectors = [
+    '.entry-content',
+    '.post-content',
+    '.td-post-content',
+    '.article-body',
+    '.article-content',
+    '.single-content',
+    '.post-body',
+    '.content-inner',
+    '.nota-texto',
+    '.cuerpo-nota',
+    'article',
+  ];
+
+  let bodyParts = [];
+
+  for (const sel of contentSelectors) {
+    const container = $(sel).first();
+    if (container.length) {
+      container.find('p, blockquote').each((_, el) => {
+        const text = $(el).text().trim();
+        if (text.length > 40) bodyParts.push(text);
+      });
+      if (bodyParts.length >= 2) break; // found enough content
+    }
+  }
+
+  // Strategy 2: fallback — collect ALL paragraphs and blockquotes on the page
+  // with length > 60 chars (likely article body, not nav/widget snippets)
+  if (bodyParts.length < 2) {
+    bodyParts = [];
+    $('p, blockquote').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.length > 60) bodyParts.push(text);
+    });
+  }
+
+  // Deduplicate consecutive identical lines
+  const seen = new Set();
+  const unique = bodyParts.filter((t) => {
+    if (seen.has(t)) return false;
+    seen.add(t);
+    return true;
+  });
+
+  const body = unique.join('\n\n');
+
+  // ── Category ──────────────────────────────────────────────────────────────
   const match = url.match(/puentelibre\.mx\/([^/]+)\//);
   const sourceCategory = match?.[1] || 'local';
 
-  return { title, body, imageUrl: imageUrl || '', sourceCategory, sourceUrl: url };
+  return { title, body, imageUrl, sourceCategory, sourceUrl: url };
 }
 
 // ─── OpenAI — Watermark detection ────────────────────────────────────────────
