@@ -1,6 +1,8 @@
 import React, { useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
+import DOMPurify from "dompurify";
 import { base44 } from "@/api/base44Client";
 import { getCategoryName, formatDateTime } from "@/lib/categories";
 import ArticleCard from "@/components/public/ArticleCard";
@@ -11,7 +13,13 @@ export default function ArticleDetail() {
 
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ["article", slug],
-    queryFn: () => base44.entities.Article.filter({ slug }, "-published_at", 1),
+    queryFn: async () => {
+      const bySlug = await base44.entities.Article.filter({ slug }, "-published_at", 1);
+      if (bySlug.length) return bySlug;
+      // Fallback: slug param might be a legacy id
+      const all = await base44.entities.Article.list("-created_date", 500);
+      return all.filter((a) => a.id === slug);
+    },
   });
 
   const article = articles[0];
@@ -66,8 +74,24 @@ export default function ArticleDetail() {
     );
   }
 
+  const cleanBody = DOMPurify.sanitize(article.body || "");
+  const pageUrl = typeof window !== "undefined" ? window.location.href : "";
+
   return (
     <article className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+      <Helmet>
+        <title>{article.title} | JuarezBravo.com</title>
+        <meta name="description" content={article.excerpt || article.title} />
+        <meta property="og:title" content={article.title} />
+        <meta property="og:description" content={article.excerpt || article.title} />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content={pageUrl} />
+        {article.cover_image && <meta property="og:image" content={article.cover_image} />}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={article.title} />
+        <meta name="twitter:description" content={article.excerpt || article.title} />
+        {article.cover_image && <meta name="twitter:image" content={article.cover_image} />}
+      </Helmet>
       {/* Breadcrumb */}
       <div className="text-xs uppercase tracking-widest text-muted-foreground mb-4">
         <Link to="/" className="hover:text-primary">
@@ -167,7 +191,7 @@ export default function ArticleDetail() {
       {/* Body */}
       <div
         className="article-content max-w-3xl mx-auto"
-        dangerouslySetInnerHTML={{ __html: article.body || "" }}
+        dangerouslySetInnerHTML={{ __html: cleanBody }}
       />
 
       {/* Tags */}

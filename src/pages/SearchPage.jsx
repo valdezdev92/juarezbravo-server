@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { base44 } from "@/api/base44Client";
 import ArticleCard from "@/components/public/ArticleCard";
 import { Search } from "lucide-react";
@@ -26,6 +27,10 @@ export default function SearchPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <Helmet>
+        <title>{query ? `"${query}" — Buscar` : "Buscar"} | JuarezBravo.com</title>
+        <meta name="robots" content="noindex" />
+      </Helmet>
       <h1 className="font-serif font-bold text-4xl mb-6 flex items-center gap-3">
         <span className="w-2 h-10 bg-primary" />
         Buscar

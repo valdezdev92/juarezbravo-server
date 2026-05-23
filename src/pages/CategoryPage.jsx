@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { base44 } from "@/api/base44Client";
 import { CATEGORIES, getCategoryName } from "@/lib/categories";
 import ArticleCard from "@/components/public/ArticleCard";
@@ -23,6 +24,12 @@ export default function CategoryPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <Helmet>
+        <title>{categoryName} | JuarezBravo.com</title>
+        <meta name="description" content={`Noticias de ${categoryName} en Ciudad Juárez — JuarezBravo.com`} />
+        <meta property="og:title" content={`${categoryName} | JuarezBravo.com`} />
+        <meta property="og:description" content={`Noticias de ${categoryName} en Ciudad Juárez`} />
+      </Helmet>
       {/* Header */}
       <div className="border-b-2 border-foreground pb-4 mb-8">
         <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">

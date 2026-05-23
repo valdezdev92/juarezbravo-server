@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { base44 } from "@/api/base44Client";
 import ArticleCard from "@/components/public/ArticleCard";
 
@@ -21,6 +22,11 @@ export default function TagPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <Helmet>
+        <title>#{slug} | JuarezBravo.com</title>
+        <meta name="description" content={`Noticias etiquetadas con #${slug} en JuarezBravo.com`} />
+        <meta property="og:title" content={`#${slug} | JuarezBravo.com`} />
+      </Helmet>
       <div className="border-b-2 border-foreground pb-4 mb-8">
         <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
           <Link to="/" className="hover:text-primary">Inicio</Link> / Etiqueta

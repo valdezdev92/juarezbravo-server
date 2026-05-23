@@ -1,5 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { base44 } from "@/api/base44Client";
 import ArticleCard from "@/components/public/ArticleCard";
 import SectionHeader from "@/components/public/SectionHeader";
@@ -54,6 +55,13 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <Helmet>
+        <title>JuarezBravo.com — Noticias de Ciudad Juárez</title>
+        <meta name="description" content="Las últimas noticias de Ciudad Juárez: seguridad, política, sociedad, deportes y entretenimiento." />
+        <meta property="og:title" content="JuarezBravo.com — Noticias de Ciudad Juárez" />
+        <meta property="og:description" content="Las últimas noticias de Ciudad Juárez: seguridad, política, sociedad, deportes y entretenimiento." />
+        <meta property="og:type" content="website" />
+      </Helmet>
       {/* Hero + Sidebar */}
       <section className="grid lg:grid-cols-3 gap-6 mb-12">
         <div className="lg:col-span-2">

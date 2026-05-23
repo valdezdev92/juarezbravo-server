@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { CATEGORIES, slugify } from "@/lib/categories";
-import { ArrowLeft, Save, Upload, X, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Save, X, Image as ImageIcon } from "lucide-react";
 
 const EMPTY = {
   title: "",
@@ -47,7 +47,16 @@ export default function AdminArticleEditor() {
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ["admin", "article", id],
-    queryFn: () => base44.entities.Article.list().then((all) => all.find((a) => a.id === id)),
+    queryFn: async () => {
+      // Use the already-fetched article list from cache when available
+      const cached = queryClient.getQueryData(["admin", "articles"]);
+      if (cached) {
+        const found = cached.find((a) => a.id === id);
+        if (found) return found;
+      }
+      const all = await base44.entities.Article.list("-created_date", 500);
+      return all.find((a) => a.id === id) ?? null;
+    },
     enabled: isEdit,
   });
 

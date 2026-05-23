@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { AlertCircle } from "lucide-react";
 
 export default function BreakingTicker() {
-  const [items, setItems] = useState([]);
-
-  useEffect(() => {
-    base44.entities.BreakingNewsTicker.filter({ is_active: true }, "order", 30)
-      .then((data) => setItems(data || []))
-      .catch(() => setItems([]));
-  }, []);
+  const { data: items = [] } = useQuery({
+    queryKey: ["ticker", "active"],
+    queryFn: () =>
+      base44.entities.BreakingNewsTicker.filter({ is_active: true }, "order", 30),
+    staleTime: 60_000,
+  });
 
   if (!items.length) return null;
 
