@@ -223,11 +223,35 @@ async function scrapeArticle(url) {
   return { title, body, imageUrl, sourceCategory, sourceUrl: url };
 }
 
-// ─── OpenAI — Watermark detection ────────────────────────────────────────────
+// ─── Watermark detection (specific to laopcion.com) ─────────────────────────
+//
+// Strategy:
+//  1. URL check  — if the image is hosted on laopcion.com, skip immediately.
+//  2. Vision check — ask GPT-4o specifically whether the image shows the
+//     "La Opción" / "laopcion.com" logo or watermark text. Generic watermark
+//     detection produces too many false positives with other outlets' CDNs.
 
-async function hasWatermark(imageUrl) {
+const BLOCKED_IMAGE_DOMAINS = ['laopcion.com', 'la-opcion.com', 'opcion.com.mx'];
+
+function imageFromBlockedDomain(imageUrl) {
+  try {
+    const { hostname } = new URL(imageUrl);
+    return BLOCKED_IMAGE_DOMAINS.some((d) => hostname.includes(d));
+  } catch {
+    return false;
+  }
+}
+
+async function hasLaOpcionWatermark(imageUrl) {
   if (!imageUrl) return false;
 
+  // Fast path: image is served directly from laopcion.com CDN
+  if (imageFromBlockedDomain(imageUrl)) {
+    console.log('     ⚠ Image hosted on laopcion.com — skipping');
+    return true;
+  }
+
+  // Vision check: look ONLY for La Opción branding, not generic watermarks
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -237,7 +261,11 @@ async function hasWatermark(imageUrl) {
           content: [
             {
               type: 'text',
-              text: 'Does this image contain a visible watermark, logo overlay, or text branding from a news outlet or company? Answer only YES or NO.',
+              text: [
+                'Look at this image carefully.',
+                'Does it contain a visible watermark, logo, or text that says "La Opción", "laopcion.com", or "opcion.com"?',
+                'Answer only YES or NO. Do NOT flag watermarks from other outlets.',
+              ].join(' '),
             },
             {
               type: 'image_url',
@@ -252,7 +280,7 @@ async function hasWatermark(imageUrl) {
     const answer = response.choices[0]?.message?.content?.trim().toUpperCase() ?? 'NO';
     return answer.startsWith('YES');
   } catch (err) {
-    console.warn(`  ⚠ Watermark check failed (${err.message}) — assuming no watermark`);
+    console.warn(`  ⚠ Watermark check failed (${err.message}) — allowing image`);
     return false;
   }
 }
@@ -377,10 +405,10 @@ async function run() {
 
         console.log(`     Title: ${article.title.slice(0, 70)}…`);
 
-        // 2. Watermark check
-        const watermark = await hasWatermark(article.imageUrl);
+        // 2. Watermark check (laopcion.com specific)
+        const watermark = await hasLaOpcionWatermark(article.imageUrl);
         if (watermark) {
-          console.log('     ✗ Watermark detected — skipping article');
+          console.log('     ✗ La Opción watermark detected — skipping article');
           processed.push(url);
           skipped++;
           await sleep(DELAY_MS);
