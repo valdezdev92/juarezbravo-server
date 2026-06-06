@@ -1,6 +1,8 @@
 #env
 .env
 .env.*
+server/uploads/*
+!server/uploads/.gitkeep
 
 # Logs
 /logs

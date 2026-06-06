@@ -1,21 +1,19 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { Tag as TagIcon } from "lucide-react";
 
 export default function AdminTags() {
   const { data: articles = [] } = useQuery({
     queryKey: ["admin", "articles"],
-    queryFn: () => base44.entities.Article.list("-created_date", 500),
+    queryFn: () => api.articles.list("-created_date", 500),
   });
 
   const tags = useMemo(() => {
     const counts = {};
     articles.forEach((a) => {
-      (a.tags || []).forEach((t) => {
-        counts[t] = (counts[t] || 0) + 1;
-      });
+      (a.tags || []).forEach((t) => { counts[t] = (counts[t] || 0) + 1; });
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [articles]);
@@ -42,10 +40,7 @@ export default function AdminTags() {
           </div>
           <ul className="divide-y divide-border">
             {tags.map(([name, count]) => (
-              <li
-                key={name}
-                className="px-5 py-3 flex items-center justify-between hover:bg-secondary/40"
-              >
+              <li key={name} className="px-5 py-3 flex items-center justify-between hover:bg-secondary/40">
                 <Link
                   to={`/etiqueta/${name}`}
                   target="_blank"

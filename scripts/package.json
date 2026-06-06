@@ -6,7 +6,6 @@
     "start": "node scraper.mjs"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.30",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
     "openai": "^4.77.0"

@@ -2,7 +2,7 @@ import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import ArticleCard from "@/components/public/ArticleCard";
 
 export default function TagPage() {
@@ -10,14 +10,8 @@ export default function TagPage() {
 
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ["tag", slug],
-    queryFn: async () => {
-      const all = await base44.entities.Article.filter(
-        { status: "published" },
-        "-published_at",
-        200
-      );
-      return all.filter((a) => (a.tags || []).includes(slug));
-    },
+    queryFn: () =>
+      api.articles.filter({ status: "published", tag: slug }, "-published_at", 100),
   });
 
   return (
@@ -39,19 +33,13 @@ export default function TagPage() {
 
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 bg-secondary animate-pulse" />
-          ))}
+          {[1, 2, 3].map((i) => <div key={i} className="h-64 bg-secondary animate-pulse" />)}
         </div>
       ) : articles.length === 0 ? (
-        <p className="text-center py-16 text-muted-foreground">
-          No hay noticias con esta etiqueta.
-        </p>
+        <p className="text-center py-16 text-muted-foreground">No hay noticias con esta etiqueta.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {articles.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
+          {articles.map((article) => <ArticleCard key={article.id} article={article} />)}
         </div>
       )}
     </div>

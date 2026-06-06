@@ -1,19 +1,17 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import { AlertCircle } from "lucide-react";
 
 export default function BreakingTicker() {
   const { data: items = [] } = useQuery({
     queryKey: ["ticker", "active"],
-    queryFn: () =>
-      base44.entities.BreakingNewsTicker.filter({ is_active: true }, "order", 30),
+    queryFn: () => api.ticker.filter({ is_active: true }, "order", 30),
     staleTime: 60_000,
   });
 
   if (!items.length) return null;
 
-  // Duplicate for seamless loop
   const loop = [...items, ...items];
 
   return (
@@ -21,9 +19,7 @@ export default function BreakingTicker() {
       <div className="flex items-stretch">
         <div className="flex items-center gap-2 px-4 py-2 bg-black/20 shrink-0 z-10">
           <AlertCircle className="w-4 h-4" />
-          <span className="text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-            Último Momento
-          </span>
+          <span className="text-xs font-bold uppercase tracking-wider whitespace-nowrap">Último Momento</span>
         </div>
         <div className="flex-1 overflow-hidden relative">
           <div className="ticker-track flex whitespace-nowrap py-2">

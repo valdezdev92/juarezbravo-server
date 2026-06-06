@@ -1,25 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { CATEGORIES, slugify } from "@/lib/categories";
 import { ArrowLeft, Save, X, Image as ImageIcon } from "lucide-react";
 
 const EMPTY = {
-  title: "",
-  slug: "",
-  excerpt: "",
-  body: "",
-  cover_image: "",
-  category: "",
-  tags: [],
-  status: "draft",
-  is_breaking_news: false,
-  is_featured: false,
-  author: "",
-  published_at: "",
+  title: "", slug: "", excerpt: "", body: "", cover_image: "",
+  category: "", tags: [], status: "draft",
+  is_breaking_news: false, is_featured: false, author: "", published_at: "",
 };
 
 const quillModules = {
@@ -34,27 +25,26 @@ const quillModules = {
 };
 
 export default function AdminArticleEditor() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const isEdit = Boolean(id);
+  const { id }       = useParams();
+  const navigate     = useNavigate();
+  const queryClient  = useQueryClient();
+  const isEdit       = Boolean(id);
 
-  const [form, setForm] = useState(EMPTY);
-  const [tagInput, setTagInput] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [form, setForm]             = useState(EMPTY);
+  const [tagInput, setTagInput]     = useState("");
+  const [uploading, setUploading]   = useState(false);
+  const [error, setError]           = useState("");
+  const [slugTouched, setSlugTouch] = useState(false);
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ["admin", "article", id],
     queryFn: async () => {
-      // Use the already-fetched article list from cache when available
       const cached = queryClient.getQueryData(["admin", "articles"]);
       if (cached) {
         const found = cached.find((a) => a.id === id);
         if (found) return found;
       }
-      const all = await base44.entities.Article.list("-created_date", 500);
+      const all = await api.articles.list("-created_date", 500);
       return all.find((a) => a.id === id) ?? null;
     },
     enabled: isEdit,
@@ -63,26 +53,22 @@ export default function AdminArticleEditor() {
   useEffect(() => {
     if (existing) {
       setForm({ ...EMPTY, ...existing, tags: existing.tags || [] });
-      setSlugTouched(true);
+      setSlugTouch(true);
     }
   }, [existing]);
 
-  // Auto-slug from title
   useEffect(() => {
     if (!slugTouched && !isEdit) {
       setForm((f) => ({ ...f, slug: slugify(f.title) }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.title]);
+  }, [form.title]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => {
-      if (isEdit) {
-        return base44.entities.Article.update(id, payload);
-      }
-      return base44.entities.Article.create(payload);
+      if (isEdit) return api.articles.update(id, payload);
+      return api.articles.create(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "articles"] });
@@ -95,18 +81,13 @@ export default function AdminArticleEditor() {
   const handleSubmit = (e, publishNow = false) => {
     e.preventDefault();
     setError("");
-    if (!form.title.trim()) {
-      setError("El título es obligatorio.");
-      return;
-    }
+    if (!form.title.trim()) { setError("El título es obligatorio."); return; }
     const payload = {
       ...form,
       slug: form.slug || slugify(form.title),
       tags: form.tags || [],
     };
-    if (publishNow) {
-      payload.status = "published";
-    }
+    if (publishNow) payload.status = "published";
     if (payload.status === "published" && !payload.published_at) {
       payload.published_at = new Date().toISOString();
     }
@@ -118,9 +99,9 @@ export default function AdminArticleEditor() {
     if (!file) return;
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await api.upload(file);
       setField("cover_image", file_url);
-    } catch (err) {
+    } catch {
       setError("No se pudo subir la imagen.");
     }
     setUploading(false);
@@ -129,18 +110,11 @@ export default function AdminArticleEditor() {
   const addTag = () => {
     const v = tagInput.trim();
     if (!v) return;
-    if (!form.tags.includes(v)) {
-      setField("tags", [...form.tags, v]);
-    }
+    if (!form.tags.includes(v)) setField("tags", [...form.tags, v]);
     setTagInput("");
   };
 
-  const removeTag = (t) => {
-    setField(
-      "tags",
-      form.tags.filter((x) => x !== t)
-    );
-  };
+  const removeTag = (t) => setField("tags", form.tags.filter((x) => x !== t));
 
   const wordCount = useMemo(() => {
     return (form.body || "").replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length;
@@ -154,11 +128,7 @@ export default function AdminArticleEditor() {
     <form onSubmit={(e) => handleSubmit(e)} className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between border-b border-border pb-4">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate("/admin/articulos")}
-            className="p-2 hover:bg-secondary"
-          >
+          <button type="button" onClick={() => navigate("/admin/articulos")} className="p-2 hover:bg-secondary">
             <ArrowLeft className="w-4 h-4" />
           </button>
           <h1 className="font-serif font-bold text-2xl sm:text-3xl">
@@ -171,8 +141,7 @@ export default function AdminArticleEditor() {
             disabled={saveMutation.isPending}
             className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-secondary text-foreground text-sm font-semibold uppercase hover:bg-secondary/80"
           >
-            <Save className="w-4 h-4" />
-            Guardar Borrador
+            <Save className="w-4 h-4" />Guardar Borrador
           </button>
           <button
             type="button"
@@ -186,9 +155,7 @@ export default function AdminArticleEditor() {
       </div>
 
       {error && (
-        <div className="bg-primary/10 border border-primary text-primary px-4 py-2 text-sm">
-          {error}
-        </div>
+        <div className="bg-primary/10 border border-primary text-primary px-4 py-2 text-sm">{error}</div>
       )}
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -196,9 +163,7 @@ export default function AdminArticleEditor() {
         <div className="lg:col-span-2 space-y-5">
           <div className="bg-white border border-border p-5 space-y-4">
             <div>
-              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">
-                Título *
-              </label>
+              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Título *</label>
               <input
                 value={form.title}
                 onChange={(e) => setField("title", e.target.value)}
@@ -206,29 +171,18 @@ export default function AdminArticleEditor() {
                 className="w-full mt-1 font-serif font-bold text-2xl bg-transparent border-b border-border focus:border-primary outline-none py-2"
               />
             </div>
-
             <div>
-              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">
-                URL (slug)
-              </label>
+              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">URL (slug)</label>
               <input
                 value={form.slug}
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  setField("slug", slugify(e.target.value));
-                }}
+                onChange={(e) => { setSlugTouch(true); setField("slug", slugify(e.target.value)); }}
                 placeholder="url-de-la-noticia"
                 className="w-full mt-1 bg-secondary border border-border px-3 py-2 text-sm font-mono outline-none focus:border-primary"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                /noticias/{form.slug || "..."}
-              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">/noticias/{form.slug || "..."}</p>
             </div>
-
             <div>
-              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">
-                Resumen
-              </label>
+              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Resumen</label>
               <textarea
                 value={form.excerpt}
                 onChange={(e) => setField("excerpt", e.target.value)}
@@ -241,12 +195,8 @@ export default function AdminArticleEditor() {
 
           <div className="bg-white border border-border">
             <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-              <label className="text-xs uppercase tracking-widest font-bold">
-                Cuerpo del artículo
-              </label>
-              <span className="text-[11px] text-muted-foreground">
-                {wordCount} palabras
-              </span>
+              <label className="text-xs uppercase tracking-widest font-bold">Cuerpo del artículo</label>
+              <span className="text-[11px] text-muted-foreground">{wordCount} palabras</span>
             </div>
             <ReactQuill
               theme="snow"
@@ -260,15 +210,10 @@ export default function AdminArticleEditor() {
 
         {/* Sidebar */}
         <aside className="space-y-5">
-          {/* Status / flags */}
           <div className="bg-white border border-border p-5 space-y-3">
-            <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">
-              Publicación
-            </h3>
+            <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">Publicación</h3>
             <div>
-              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">
-                Estado
-              </label>
+              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Estado</label>
               <select
                 value={form.status}
                 onChange={(e) => setField("status", e.target.value)}
@@ -279,27 +224,15 @@ export default function AdminArticleEditor() {
               </select>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.is_breaking_news}
-                onChange={(e) => setField("is_breaking_news", e.target.checked)}
-                className="w-4 h-4 accent-primary"
-              />
+              <input type="checkbox" checked={form.is_breaking_news} onChange={(e) => setField("is_breaking_news", e.target.checked)} className="w-4 h-4 accent-primary" />
               <span className="text-sm font-medium">Marcar como urgente</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.is_featured}
-                onChange={(e) => setField("is_featured", e.target.checked)}
-                className="w-4 h-4 accent-primary"
-              />
+              <input type="checkbox" checked={form.is_featured} onChange={(e) => setField("is_featured", e.target.checked)} className="w-4 h-4 accent-primary" />
               <span className="text-sm font-medium">Mostrar en hero principal</span>
             </label>
             <div>
-              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">
-                Autor
-              </label>
+              <label className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Autor</label>
               <input
                 value={form.author}
                 onChange={(e) => setField("author", e.target.value)}
@@ -309,18 +242,11 @@ export default function AdminArticleEditor() {
             </div>
           </div>
 
-          {/* Cover image */}
           <div className="bg-white border border-border p-5 space-y-3">
-            <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">
-              Imagen de portada
-            </h3>
+            <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">Imagen de portada</h3>
             {form.cover_image ? (
               <div className="relative">
-                <img
-                  src={form.cover_image}
-                  alt="cover"
-                  className="w-full aspect-[16/10] object-cover"
-                />
+                <img src={form.cover_image} alt="cover" className="w-full aspect-[16/10] object-cover" />
                 <button
                   type="button"
                   onClick={() => setField("cover_image", "")}
@@ -332,21 +258,12 @@ export default function AdminArticleEditor() {
             ) : (
               <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border py-8 cursor-pointer hover:border-primary hover:bg-secondary/40">
                 <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">
-                  {uploading ? "Subiendo..." : "Haz clic para subir imagen"}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
+                <span className="text-xs text-muted-foreground">{uploading ? "Subiendo..." : "Haz clic para subir imagen"}</span>
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
               </label>
             )}
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                O pega una URL
-              </label>
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground">O pega una URL</label>
               <input
                 value={form.cover_image}
                 onChange={(e) => setField("cover_image", e.target.value)}
@@ -356,92 +273,46 @@ export default function AdminArticleEditor() {
             </div>
           </div>
 
-          {/* Category */}
           <div className="bg-white border border-border p-5 space-y-3">
-            <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">
-              Categoría
-            </h3>
+            <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">Categoría</h3>
             <select
               value={form.category}
               onChange={(e) => setField("category", e.target.value)}
               className="w-full bg-background border border-border px-3 py-2 text-sm focus:border-primary outline-none"
             >
               <option value="">Sin categoría</option>
-              {CATEGORIES.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.name}
-                </option>
-              ))}
+              {CATEGORIES.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
             </select>
           </div>
 
-          {/* Tags */}
           <div className="bg-white border border-border p-5 space-y-3">
-            <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">
-              Etiquetas
-            </h3>
+            <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">Etiquetas</h3>
             <div className="flex gap-2">
               <input
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addTag();
-                  }
-                }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
                 placeholder="Agregar etiqueta"
                 className="flex-1 bg-background border border-border px-3 py-2 text-sm focus:border-primary outline-none"
               />
-              <button
-                type="button"
-                onClick={addTag}
-                className="px-3 py-2 bg-primary text-primary-foreground text-xs font-semibold uppercase"
-              >
-                +
-              </button>
+              <button type="button" onClick={addTag} className="px-3 py-2 bg-primary text-primary-foreground text-xs font-semibold uppercase">+</button>
             </div>
             <div className="flex flex-wrap gap-2">
               {form.tags.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 bg-secondary px-2 py-1 text-xs"
-                >
+                <span key={t} className="inline-flex items-center gap-1 bg-secondary px-2 py-1 text-xs">
                   {t}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(t)}
-                    className="hover:text-primary"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  <button type="button" onClick={() => removeTag(t)} className="hover:text-primary"><X className="w-3 h-3" /></button>
                 </span>
               ))}
-              {form.tags.length === 0 && (
-                <span className="text-xs text-muted-foreground">Sin etiquetas</span>
-              )}
+              {form.tags.length === 0 && <span className="text-xs text-muted-foreground">Sin etiquetas</span>}
             </div>
           </div>
         </aside>
       </div>
 
-      {/* Sticky bottom save bar (mobile) */}
       <div className="sm:hidden flex gap-2">
-        <button
-          type="submit"
-          disabled={saveMutation.isPending}
-          className="flex-1 px-4 py-3 bg-secondary text-sm font-semibold uppercase"
-        >
-          Guardar Borrador
-        </button>
-        <button
-          type="button"
-          onClick={(e) => handleSubmit(e, true)}
-          disabled={saveMutation.isPending}
-          className="flex-1 px-4 py-3 bg-primary text-primary-foreground text-sm font-semibold uppercase"
-        >
-          Publicar
-        </button>
+        <button type="submit" disabled={saveMutation.isPending} className="flex-1 px-4 py-3 bg-secondary text-sm font-semibold uppercase">Guardar Borrador</button>
+        <button type="button" onClick={(e) => handleSubmit(e, true)} disabled={saveMutation.isPending} className="flex-1 px-4 py-3 bg-primary text-primary-foreground text-sm font-semibold uppercase">Publicar</button>
       </div>
     </form>
   );

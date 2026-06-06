@@ -1,77 +1,52 @@
 import React from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import ArticleCard from "@/components/public/ArticleCard";
 import SectionHeader from "@/components/public/SectionHeader";
 import { CATEGORIES } from "@/lib/categories";
 import { Link } from "react-router-dom";
 
-// Pick one article per category from the pool for sidebar variety
 function pickDiverseSidebar(pool, count = 4) {
   const picked = [];
   const usedIds = new Set();
 
-  // First pass: one per category
   for (const cat of CATEGORIES) {
     if (picked.length >= count) break;
     const found = pool.find((a) => a.category === cat.slug && !usedIds.has(a.id));
-    if (found) {
-      picked.push(found);
-      usedIds.add(found.id);
-    }
+    if (found) { picked.push(found); usedIds.add(found.id); }
   }
 
-  // Second pass: fill remaining slots chronologically
   for (const a of pool) {
     if (picked.length >= count) break;
-    if (!usedIds.has(a.id)) {
-      picked.push(a);
-      usedIds.add(a.id);
-    }
+    if (!usedIds.has(a.id)) { picked.push(a); usedIds.add(a.id); }
   }
 
   return picked;
 }
 
 export default function Home() {
-  // Main feed
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ["articles", "published"],
-    queryFn: () =>
-      base44.entities.Article.filter({ status: "published" }, "-published_at", 100),
+    queryFn: () => api.articles.filter({ status: "published" }, "-published_at", 100),
   });
 
-  // Independent per-category queries (5 parallel calls)
   const categoryQueries = useQueries({
     queries: CATEGORIES.map((cat) => ({
       queryKey: ["articles", "cat", cat.slug],
       queryFn: () =>
-        base44.entities.Article.filter(
-          { status: "published", category: cat.slug },
-          "-published_at",
-          5
-        ),
+        api.articles.filter({ status: "published", category: cat.slug }, "-published_at", 5),
       staleTime: 5 * 60 * 1000,
     })),
   });
 
-  // Hero = always the single most recently published article (index 0)
-  // "is_featured" is kept for manual editorial override only when
-  // the editor explicitly wants to pin a specific story.
   const featured  = articles[0];
-
-  // "Último Momento" = the next 4 freshest articles right after the hero
-  // These are the most recently scraped stories, shown as breaking news.
   const breaking  = articles.slice(1, 5);
-
-  // Sidebar + latest come from the remaining pool
   const pool      = articles.slice(5);
   const secondary = pickDiverseSidebar(pool, 4);
   const shownIds  = new Set(secondary.map((a) => a.id));
   const latest    = pool.filter((a) => !shownIds.has(a.id)).slice(0, 18);
 
-  // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 space-y-12">
@@ -88,7 +63,6 @@ export default function Home() {
     );
   }
 
-  // ── Empty state ────────────────────────────────────────────────────────────
   if (!articles.length) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 text-center">
@@ -118,17 +92,14 @@ export default function Home() {
         <meta property="og:type" content="website" />
       </Helmet>
 
-      {/* ── 1. Hero + Sidebar ──────────────────────────────────────────────── */}
+      {/* Hero + Sidebar */}
       <section className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           {featured && <ArticleCard article={featured} variant="hero" />}
         </div>
-
         <aside className="bg-card border border-border p-4 flex flex-col">
           <div className="flex items-center gap-2 border-b-2 border-primary pb-2 mb-3">
-            <h3 className="font-serif font-bold text-sm uppercase tracking-widest">
-              Lo más destacado
-            </h3>
+            <h3 className="font-serif font-bold text-sm uppercase tracking-widest">Lo más destacado</h3>
           </div>
           {secondary.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No hay más noticias aún.</p>
@@ -140,51 +111,39 @@ export default function Home() {
         </aside>
       </section>
 
-      {/* ── 2. Último Momento — los artículos más recientes del scraper ──────── */}
+      {/* Último Momento */}
       {breaking.length >= 1 && (
         <section>
           <SectionHeader title="Último Momento" subtitle="Lo más reciente en Ciudad Juárez" />
-          <div
-            className={`grid gap-4 grid-cols-1 sm:grid-cols-2 ${
-              breaking.length >= 3 ? "lg:grid-cols-4" : "lg:grid-cols-2"
-            }`}
-          >
-            {breaking.map((article) => (
-              <ArticleCard key={article.id} article={article} />
-            ))}
+          <div className={`grid gap-4 grid-cols-1 sm:grid-cols-2 ${breaking.length >= 3 ? "lg:grid-cols-4" : "lg:grid-cols-2"}`}>
+            {breaking.map((article) => <ArticleCard key={article.id} article={article} />)}
           </div>
         </section>
       )}
 
-      {/* ── 3. Latest news grid — articles not shown above ─────────────────── */}
+      {/* Latest */}
       {latest.length > 0 && (
         <section>
           <SectionHeader title="Últimas Noticias" subtitle="Lo más reciente publicado" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {latest.map((article) => (
-              <ArticleCard key={article.id} article={article} />
-            ))}
+            {latest.map((article) => <ArticleCard key={article.id} article={article} />)}
           </div>
         </section>
       )}
 
-      {/* ── 4. Category sections — featured card + compact list ────────────── */}
+      {/* Category sections */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-10">
         {CATEGORIES.map((cat, i) => {
           const catArticles = categoryQueries[i]?.data ?? [];
           if (!catArticles.length) return null;
-
           const [lead, ...rest] = catArticles;
 
           return (
             <div key={cat.slug}>
-              {/* Section header */}
               <div className="flex items-end justify-between border-b-2 border-foreground pb-2 mb-4">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-6 bg-primary" />
-                  <h3 className="font-serif font-bold text-xl uppercase tracking-tight">
-                    {cat.name}
-                  </h3>
+                  <h3 className="font-serif font-bold text-xl uppercase tracking-tight">{cat.name}</h3>
                 </div>
                 <Link
                   to={`/categoria/${cat.slug}`}
@@ -193,16 +152,10 @@ export default function Home() {
                   Ver todo →
                 </Link>
               </div>
-
-              {/* Lead article — full card with image */}
               <ArticleCard article={lead} />
-
-              {/* Rest — compact list */}
               {rest.length > 0 && (
                 <div className="mt-3 border-t border-border">
-                  {rest.map((article) => (
-                    <ArticleCard key={article.id} article={article} variant="compact" />
-                  ))}
+                  {rest.map((article) => <ArticleCard key={article.id} article={article} variant="compact" />)}
                 </div>
               )}
             </div>

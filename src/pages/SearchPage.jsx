@@ -1,29 +1,21 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import ArticleCard from "@/components/public/ArticleCard";
 import { Search } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 400);
 
-  const { data: allArticles = [] } = useQuery({
-    queryKey: ["search-all"],
+  const { data: results = [], isFetching } = useQuery({
+    queryKey: ["search", debouncedQuery],
     queryFn: () =>
-      base44.entities.Article.filter({ status: "published" }, "-published_at", 200),
+      api.articles.filter({ status: "published", search: debouncedQuery }, "-published_at", 50),
+    enabled: debouncedQuery.trim().length >= 2,
   });
-
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return allArticles.filter(
-      (a) =>
-        (a.title || "").toLowerCase().includes(q) ||
-        (a.excerpt || "").toLowerCase().includes(q) ||
-        (a.body || "").toLowerCase().includes(q)
-    );
-  }, [query, allArticles]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -48,19 +40,17 @@ export default function SearchPage() {
         />
       </div>
 
-      {query.trim() && (
+      {debouncedQuery.trim().length >= 2 && !isFetching && (
         <p className="text-sm text-muted-foreground mb-6">
-          {results.length} resultado{results.length !== 1 ? "s" : ""} para “{query}”
+          {results.length} resultado{results.length !== 1 ? "s" : ""} para "{debouncedQuery}"
         </p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {results.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
+        {results.map((article) => <ArticleCard key={article.id} article={article} />)}
       </div>
 
-      {query.trim() && results.length === 0 && (
+      {debouncedQuery.trim().length >= 2 && !isFetching && results.length === 0 && (
         <p className="text-center text-muted-foreground py-12">
           No encontramos noticias que coincidan con tu búsqueda.
         </p>
