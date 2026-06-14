@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -13,18 +12,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
   }
 
-  if (username !== process.env.ADMIN_USER) {
-    return res.status(401).json({ error: 'Credenciales inválidas' });
-  }
-
-  let valid = false;
-  try {
-    valid = await bcrypt.compare(password, process.env.ADMIN_PASSWORD_HASH);
-  } catch {
-    return res.status(500).json({ error: 'Error interno' });
-  }
-
-  if (!valid) {
+  if (username !== process.env.ADMIN_USER || password !== process.env.ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Credenciales inválidas' });
   }
 
