@@ -16,7 +16,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const API_URL       = process.env.API_URL || 'http://localhost:3000';
+const API_URL = (process.env.API_URL || 'http://localhost:3000')
+  .trim()
+  .replace(/\/+$/, '')      // quita trailing slashes
+  .replace(/\/api$/, '');   // quita /api accidental si lo agregaron
+
+try {
+  new URL(API_URL);
+} catch {
+  console.error(`❌ API_URL inválida: ${JSON.stringify(process.env.API_URL)}`);
+  console.error('   Esperado: https://tu-dominio.com (sin /api, sin slash final)');
+  process.exit(1);
+}
+
 const SCRAPER_KEY   = process.env.SCRAPER_API_KEY;
 const openai        = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
