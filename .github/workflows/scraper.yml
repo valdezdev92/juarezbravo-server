@@ -43,7 +43,8 @@ jobs:
         working-directory: scripts
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
+          API_URL: ${{ secrets.API_URL }}
         run: node scraper.mjs
 
       - name: Commit updated processed list
