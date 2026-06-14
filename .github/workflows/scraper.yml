@@ -2,8 +2,8 @@ name: News Scraper
 
 on:
   schedule:
-    # Runs every 10 minutes
-    - cron: '*/10 * * * *'
+    # Runs every 20 minutes (3 times per hour: :00, :20, :40)
+    - cron: '*/20 * * * *'
   # Allow manual trigger from the GitHub Actions tab
   workflow_dispatch:
 
