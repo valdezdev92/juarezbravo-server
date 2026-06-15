@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { publishArticleToFacebook } from '../services/facebook.js';
 
 const router = Router();
 
@@ -103,7 +104,13 @@ router.post('/', requireAuth, async (req, res) => {
     );
 
     const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [id]);
-    res.status(201).json(parseRow(rows[0]));
+    const article = parseRow(rows[0]);
+
+    if (article.status === 'published') {
+      publishArticleToFacebook(article).catch(() => {});
+    }
+
+    res.status(201).json(article);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
