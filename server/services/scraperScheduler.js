@@ -1,7 +1,7 @@
 /**
  * Scheduler FALLBACK del scraper.
  *
- * El scraper primario es GitHub Actions (cron */20 en :00, :20, :40 UTC).
+ * El scraper primario es GitHub Actions (cron cada 20 min en :00, :20, :40 UTC).
  * Este scheduler in-process corre cada 20 min desfasado (:10, :30, :50 UTC)
  * y SOLO scrapea si no hubo un run en los últimos 25 min (de cualquier source).
  *
