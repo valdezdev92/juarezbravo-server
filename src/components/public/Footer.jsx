@@ -72,6 +72,16 @@ export default function Footer() {
                   Panel Editorial
                 </Link>
               </li>
+              <li>
+                <Link to="/privacidad" className="text-sm text-white/70 hover:text-primary">
+                  Política de Privacidad
+                </Link>
+              </li>
+              <li>
+                <Link to="/terminos" className="text-sm text-white/70 hover:text-primary">
+                  Términos del Servicio
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

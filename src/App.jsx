@@ -13,6 +13,8 @@ import ArticleDetail from '@/pages/ArticleDetail';
 import CategoryPage from '@/pages/CategoryPage';
 import TagPage from '@/pages/TagPage';
 import SearchPage from '@/pages/SearchPage';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import TermsOfService from '@/pages/TermsOfService';
 
 // Admin
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -36,6 +38,8 @@ function App() {
                 <Route path="/categoria/:slug" element={<CategoryPage />} />
                 <Route path="/etiqueta/:slug" element={<TagPage />} />
                 <Route path="/buscar" element={<SearchPage />} />
+                <Route path="/privacidad" element={<PrivacyPolicy />} />
+                <Route path="/terminos" element={<TermsOfService />} />
               </Route>
 
               {/* Admin routes */}
