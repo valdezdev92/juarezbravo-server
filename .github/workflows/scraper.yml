@@ -1,33 +1,26 @@
-name: News Scraper (fallback)
+name: News Scraper (primary)
 
-# Este workflow es el FALLBACK del scraper que corre dentro del server.
-# Antes de scrapear, consulta /api/scraper/status:
-#   - Si el server scrapeó con éxito hace menos de FALLBACK_THRESHOLD_MIN minutos
-#     → salta (server está sano)
-#   - Si no hay respuesta o el último run fue hace más tiempo
-#     → asume server caído y corre como respaldo
+# Scraper PRIMARIO. Corre cada 20 min (:00, :20, :40 UTC) — es la fuente
+# normal de scraping. Tras correr, reporta al server via /api/scraper/heartbeat
+# para que el fallback in-process del server sepa que ya hubo un run reciente
+# y se salte su slot.
+#
+# El scraper in-process del server actúa como FALLBACK: corre cada 20 min
+# desfasado (:10, :30, :50 UTC), y solo se ejecuta si no hubo un heartbeat
+# en los últimos 25 min.
 
 on:
   schedule:
-    # Cada 30 min — corre con menor frecuencia que el server (cada 20 min)
-    - cron: '*/30 * * * *'
+    - cron: '*/20 * * * *'
   workflow_dispatch:
-    inputs:
-      force:
-        description: 'Forzar ejecución aunque el server scrape esté sano'
-        required: false
-        default: 'false'
 
 concurrency:
   group: scraper
   cancel-in-progress: false
 
-env:
-  FALLBACK_THRESHOLD_MIN: 35
-
 jobs:
   scrape:
-    name: Scrape & Publish (fallback)
+    name: Scrape & Publish
     runs-on: ubuntu-latest
     timeout-minutes: 8
 
@@ -35,44 +28,12 @@ jobs:
       contents: write
 
     steps:
-      - name: Check server scraper health
-        id: health
-        run: |
-          API_URL="${{ secrets.API_URL }}"
-          FORCE="${{ github.event.inputs.force }}"
-
-          if [ "$FORCE" = "true" ]; then
-            echo "Manual run con force=true — saltándose el health check"
-            echo "should_run=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          STATUS_JSON=$(curl -sfm 10 "${API_URL}/api/scraper/status" || echo '')
-          if [ -z "$STATUS_JSON" ]; then
-            echo "No se pudo contactar al server — corriendo como fallback"
-            echo "should_run=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          LAST_MIN=$(echo "$STATUS_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); v=d.get('last_success_minutes_ago'); print(v if v is not None else 9999)")
-          echo "Server scrape exitoso hace ${LAST_MIN} min (threshold: ${FALLBACK_THRESHOLD_MIN})"
-
-          if [ "${LAST_MIN}" -lt "${FALLBACK_THRESHOLD_MIN}" ]; then
-            echo "Server scrape está sano — saltando este run"
-            echo "should_run=false" >> $GITHUB_OUTPUT
-          else
-            echo "Server scrape stale — corriendo como fallback"
-            echo "should_run=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Checkout repository
-        if: steps.health.outputs.should_run == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Setup Node.js
-        if: steps.health.outputs.should_run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -80,12 +41,11 @@ jobs:
           cache-dependency-path: scripts/package-lock.json
 
       - name: Install scraper dependencies
-        if: steps.health.outputs.should_run == 'true'
         working-directory: scripts
         run: npm install
 
       - name: Run scraper
-        if: steps.health.outputs.should_run == 'true'
+        id: scrape
         working-directory: scripts
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -93,8 +53,40 @@ jobs:
           API_URL: ${{ secrets.API_URL }}
         run: node scraper.mjs
 
+      - name: Report run to server heartbeat
+        if: always()
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
+          SCRAPE_OUTCOME: ${{ steps.scrape.outcome }}
+        run: |
+          # Slot redondeado al múltiplo de 20 min más reciente (UTC).
+          SCHEDULED_AT=$(python3 -c "
+          import datetime
+          n = datetime.datetime.utcnow().replace(second=0, microsecond=0)
+          n = n.replace(minute=n.minute - (n.minute % 20))
+          print(n.strftime('%Y-%m-%d %H:%M:%S'))
+          ")
+          STATUS="success"
+          if [ "$SCRAPE_OUTCOME" != "success" ]; then STATUS="error"; fi
+
+          PAYLOAD=$(python3 -c "
+          import json
+          print(json.dumps({
+            'scheduled_at': '${SCHEDULED_AT}',
+            'status':       '${STATUS}',
+          }))
+          ")
+
+          curl -sS -m 15 -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: ${SCRAPER_API_KEY}" \
+            -d "${PAYLOAD}" \
+            "${API_URL}/api/scraper/heartbeat" || \
+            echo "Heartbeat falló (no bloqueante)"
+
       - name: Commit updated processed list
-        if: steps.health.outputs.should_run == 'true'
+        if: steps.scrape.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

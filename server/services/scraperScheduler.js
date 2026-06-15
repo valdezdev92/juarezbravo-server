@@ -1,22 +1,39 @@
 /**
- * Programador del scraper interno.
+ * Scheduler FALLBACK del scraper.
  *
- * Corre cada 20 min (:00, :20, :40). Como hay múltiples workers de Passenger
- * (lsnode), todos disparan el cron al mismo tiempo. Para evitar doble ejecución
- * usamos un lock distribuido en MySQL via UNIQUE KEY (scheduled_at, source):
- * solo el primer INSERT gana, los demás reciben ER_DUP_ENTRY y se rinden.
+ * El scraper primario es GitHub Actions (cron */20 en :00, :20, :40 UTC).
+ * Este scheduler in-process corre cada 20 min desfasado (:10, :30, :50 UTC)
+ * y SOLO scrapea si no hubo un run en los últimos 25 min (de cualquier source).
+ *
+ * Como hay múltiples workers de Passenger (lsnode), todos disparan el cron
+ * al mismo tiempo. Para evitar doble ejecución usamos un lock distribuido en
+ * MySQL via UNIQUE KEY (scheduled_at, source).
  */
 import cron from 'node-cron';
 import db from '../db.js';
 import { runScraperCycle } from './scraper.js';
 
-const SCHEDULE_MINUTES = 20;
+const RECENT_RUN_THRESHOLD_MIN = 25;
 
 function currentSlot() {
   const slot = new Date();
   slot.setSeconds(0, 0);
-  slot.setMinutes(slot.getMinutes() - (slot.getMinutes() % SCHEDULE_MINUTES));
+  // Redondear a múltiplo de 10 min para desambiguar workers concurrentes.
+  slot.setMinutes(slot.getMinutes() - (slot.getMinutes() % 10));
   return slot;
+}
+
+async function recentSuccessfulRun() {
+  const [rows] = await db.query(
+    `SELECT id, source, started_at, status
+       FROM scraper_runs
+       WHERE started_at > NOW() - INTERVAL ? MINUTE
+         AND status IN ('running', 'success')
+       ORDER BY started_at DESC
+       LIMIT 1`,
+    [RECENT_RUN_THRESHOLD_MIN]
+  );
+  return rows[0] || null;
 }
 
 async function tryAcquireSlot(scheduledAt) {
@@ -47,15 +64,19 @@ async function finishRun(runId, status, counts, errorMessage = null) {
 }
 
 async function runOnce() {
-  const scheduledAt = currentSlot();
-  const runId = await tryAcquireSlot(scheduledAt);
-
-  if (!runId) {
-    // Otro worker tomó este slot
+  const recent = await recentSuccessfulRun();
+  if (recent) {
+    console.log(
+      `[Scheduler] Skip — último run ${recent.source} a las ${recent.started_at.toISOString()}`
+    );
     return;
   }
 
-  console.log(`[Scheduler] Corriendo slot ${scheduledAt.toISOString()} (run ${runId})`);
+  const scheduledAt = currentSlot();
+  const runId = await tryAcquireSlot(scheduledAt);
+  if (!runId) return; // Otro worker tomó este slot
+
+  console.log(`[Scheduler] FALLBACK activo — slot ${scheduledAt.toISOString()} (run ${runId})`);
   const start = Date.now();
 
   try {
@@ -82,10 +103,10 @@ export function startScraperScheduler() {
     return;
   }
 
-  // Cada 20 min, en :00, :20 y :40
-  cron.schedule(`*/${SCHEDULE_MINUTES} * * * *`, () => {
+  // Desfasado de GitHub Actions: GH corre :00/:20/:40, fallback :10/:30/:50.
+  cron.schedule('10,30,50 * * * *', () => {
     runOnce().catch((err) => console.error('[Scheduler] Error no controlado:', err));
   });
 
-  console.log(`[Scheduler] Scraper programado cada ${SCHEDULE_MINUTES} min (server-side)`);
+  console.log('[Scheduler] Fallback programado a :10/:30/:50 (corre solo si GH Actions no reportó)');
 }
