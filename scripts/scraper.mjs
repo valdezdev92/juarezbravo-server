@@ -53,7 +53,7 @@ async function getRecentTitles() {
 // ─── Scraper Config ───────────────────────────────────────────────────────────
 
 const BASE_URL              = 'https://puentelibre.mx';
-const MAX_ARTICLES_PER_SECTION = 3;
+const MAX_ARTICLES_PER_SECTION = 8;
 const MAX_PROCESSED_HISTORY = 1000;
 const DELAY_MS              = 2500;
 
