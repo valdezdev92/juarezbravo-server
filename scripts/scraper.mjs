@@ -353,7 +353,14 @@ async function run() {
         published++;
       } catch (err) {
         console.error(`     ✗ Error: ${err.message}`);
-        processed.push(url);
+        const isTransient =
+          ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED'].includes(err.code) ||
+          (err.response?.status >= 500 && err.response?.status < 600);
+        if (isTransient) {
+          console.warn(`     ⚠ Error transitorio — no se marca como procesado, reintentar`);
+        } else {
+          processed.push(url);
+        }
         errors++;
       }
 

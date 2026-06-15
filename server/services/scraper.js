@@ -327,7 +327,12 @@ export async function runScraperCycle() {
         console.log(`[Scraper] ✓ Publicado [${rewritten.category}] ${rewritten.title.slice(0, 70)}`);
       } catch (err) {
         console.error(`[Scraper] ✗ ${url}: ${err.message}`);
-        await markProcessed(url);
+        const isTransient =
+          ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED'].includes(err.code) ||
+          (err.response?.status >= 500 && err.response?.status < 600);
+        if (!isTransient) {
+          await markProcessed(url);
+        }
         counts.errors++;
       }
 
