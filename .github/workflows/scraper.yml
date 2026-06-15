@@ -63,7 +63,7 @@ jobs:
           # Slot redondeado al múltiplo de 20 min más reciente (UTC).
           SCHEDULED_AT=$(python3 -c "
           import datetime
-          n = datetime.datetime.utcnow().replace(second=0, microsecond=0)
+          n = datetime.datetime.now(datetime.UTC).replace(second=0, microsecond=0)
           n = n.replace(minute=n.minute - (n.minute % 20))
           print(n.strftime('%Y-%m-%d %H:%M:%S'))
           ")
