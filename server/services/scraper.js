@@ -12,7 +12,7 @@ import { createHash } from 'crypto';
 import db from '../db.js';
 
 const BASE_URL                = 'https://puentelibre.mx';
-const MAX_ARTICLES_PER_SECTION = 3;
+const MAX_ARTICLES_PER_SECTION = 8;
 const DELAY_MS                = 2500;
 
 const SECTIONS = [
