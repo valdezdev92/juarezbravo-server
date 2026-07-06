@@ -1,9 +1,10 @@
 /**
- * Scheduler FALLBACK del scraper.
+ * Scheduler del importador de noticias.
  *
- * El scraper primario es GitHub Actions (cron cada 20 min en :00, :20, :40 UTC).
- * Este scheduler in-process corre cada 20 min desfasado (:10, :30, :50 UTC)
- * y SOLO scrapea si no hubo un run en los últimos 25 min (de cualquier source).
+ * Corre cada 10 minutos dentro del propio server (ya no depende de GitHub
+ * Actions ni de scrapear una página externa: las noticias se obtienen de la
+ * API de NoticiasMessenger). Cada ciclo publica hasta NEWS_BATCH_SIZE
+ * noticias, de la más antigua a la más nueva.
  *
  * Como hay múltiples workers de Passenger (lsnode), todos disparan el cron
  * al mismo tiempo. Para evitar doble ejecución usamos un lock distribuido en
@@ -13,27 +14,11 @@ import cron from 'node-cron';
 import db from '../db.js';
 import { runScraperCycle } from './scraper.js';
 
-const RECENT_RUN_THRESHOLD_MIN = 25;
-
 function currentSlot() {
   const slot = new Date();
   slot.setSeconds(0, 0);
-  // Redondear a múltiplo de 10 min para desambiguar workers concurrentes.
   slot.setMinutes(slot.getMinutes() - (slot.getMinutes() % 10));
   return slot;
-}
-
-async function recentSuccessfulRun() {
-  const [rows] = await db.query(
-    `SELECT id, source, started_at, status
-       FROM scraper_runs
-       WHERE started_at > NOW() - INTERVAL ? MINUTE
-         AND status IN ('running', 'success')
-       ORDER BY started_at DESC
-       LIMIT 1`,
-    [RECENT_RUN_THRESHOLD_MIN]
-  );
-  return rows[0] || null;
 }
 
 async function tryAcquireSlot(scheduledAt) {
@@ -64,19 +49,11 @@ async function finishRun(runId, status, counts, errorMessage = null) {
 }
 
 async function runOnce() {
-  const recent = await recentSuccessfulRun();
-  if (recent) {
-    console.log(
-      `[Scheduler] Skip — último run ${recent.source} a las ${recent.started_at.toISOString()}`
-    );
-    return;
-  }
-
   const scheduledAt = currentSlot();
   const runId = await tryAcquireSlot(scheduledAt);
   if (!runId) return; // Otro worker tomó este slot
 
-  console.log(`[Scheduler] FALLBACK activo — slot ${scheduledAt.toISOString()} (run ${runId})`);
+  console.log(`[Scheduler] Ciclo ${scheduledAt.toISOString()} (run ${runId})`);
   const start = Date.now();
 
   try {
@@ -98,15 +75,14 @@ export function startScraperScheduler() {
     console.log('[Scheduler] Deshabilitado por env var SCRAPER_SCHEDULE_DISABLED');
     return;
   }
-  if (!process.env.OPENAI_API_KEY || !process.env.SCRAPER_API_KEY) {
-    console.log('[Scheduler] OPENAI_API_KEY o SCRAPER_API_KEY ausentes, no se programa');
+  if (!process.env.OPENAI_API_KEY || !process.env.SCRAPER_API_KEY || !process.env.NEWS_API_TOKEN) {
+    console.log('[Scheduler] OPENAI_API_KEY, SCRAPER_API_KEY o NEWS_API_TOKEN ausentes, no se programa');
     return;
   }
 
-  // Desfasado de GitHub Actions: GH corre :00/:20/:40, fallback :10/:30/:50.
-  cron.schedule('10,30,50 * * * *', () => {
+  cron.schedule('*/10 * * * *', () => {
     runOnce().catch((err) => console.error('[Scheduler] Error no controlado:', err));
   });
 
-  console.log('[Scheduler] Fallback programado a :10/:30/:50 (corre solo si GH Actions no reportó)');
+  console.log('[Scheduler] Importador de noticias programado cada 10 minutos');
 }
