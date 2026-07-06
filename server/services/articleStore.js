@@ -60,3 +60,62 @@ export async function listRecentTitles(limit = 500) {
   );
   return rows;
 }
+
+export async function getArticleById(id) {
+  const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [id]);
+  return rows[0] ? parseRow(rows[0]) : null;
+}
+
+export async function getArticleBySlug(slug) {
+  const [rows] = await db.query('SELECT * FROM articles WHERE slug = ?', [slug]);
+  return rows[0] ? parseRow(rows[0]) : null;
+}
+
+export async function getRecentPublished(limit = 10) {
+  const [rows] = await db.query(
+    `SELECT id, title, slug, category, published_at
+       FROM articles
+      WHERE status = 'published'
+      ORDER BY published_at DESC
+      LIMIT ${Number(limit) || 10}`
+  );
+  return rows;
+}
+
+export async function getCurrentHero() {
+  const [rows] = await db.query(
+    `SELECT * FROM articles WHERE is_featured = 1 ORDER BY updated_at DESC LIMIT 1`
+  );
+  return rows[0] ? parseRow(rows[0]) : null;
+}
+
+/**
+ * Asigna el hero a `id` y quita el flag a cualquier otro artículo.
+ * `featuredUntil` es un Date o null (permanente).
+ */
+export async function setHero(id, featuredUntil) {
+  await db.query(
+    `UPDATE articles SET is_featured = 0, featured_until = NULL WHERE is_featured = 1 AND id != ?`,
+    [id]
+  );
+  await db.query(
+    `UPDATE articles SET is_featured = 1, featured_until = ? WHERE id = ?`,
+    [featuredUntil || null, id]
+  );
+  return getArticleById(id);
+}
+
+/**
+ * Quita el flag de hero a artículos cuyo featured_until ya venció.
+ * Devuelve cuántos se limpiaron (para logging del cron).
+ */
+export async function clearExpiredHeroes() {
+  const [result] = await db.query(
+    `UPDATE articles
+        SET is_featured = 0, featured_until = NULL
+      WHERE is_featured = 1
+        AND featured_until IS NOT NULL
+        AND featured_until <= NOW()`
+  );
+  return result.affectedRows;
+}

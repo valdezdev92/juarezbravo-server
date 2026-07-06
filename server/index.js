@@ -10,6 +10,7 @@ import authRouter     from './routes/auth.js';
 import uploadRouter   from './routes/upload.js';
 import scraperRouter  from './routes/scraper.js';
 import { startScraperScheduler } from './services/scraperScheduler.js';
+import { setupTelegramWebhook } from './services/telegram.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app  = express();
@@ -25,6 +26,7 @@ app.use('/api/articles', articlesRouter);
 app.use('/api/ticker',   tickerRouter);
 app.use('/api/upload',   uploadRouter);
 app.use('/api/scraper',  scraperRouter);
+setupTelegramWebhook(app);
 
 // ── Archivos subidos (imágenes) ───────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

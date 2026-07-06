@@ -7,6 +7,14 @@ import SectionHeader from "@/components/public/SectionHeader";
 import { CATEGORIES } from "@/lib/categories";
 import { Link } from "react-router-dom";
 
+function pickHero(articles) {
+  const now = Date.now();
+  const hero = articles.find(
+    (a) => a.is_featured && (!a.featured_until || new Date(a.featured_until).getTime() > now)
+  );
+  return hero || articles[0];
+}
+
 function pickDiverseSidebar(pool, count = 4) {
   const picked = [];
   const usedIds = new Set();
@@ -40,9 +48,10 @@ export default function Home() {
     })),
   });
 
-  const featured  = articles[0];
-  const breaking  = articles.slice(1, 5);
-  const pool      = articles.slice(5);
+  const featured  = pickHero(articles);
+  const remaining = articles.filter((a) => a.id !== featured?.id);
+  const breaking  = remaining.slice(0, 4);
+  const pool      = remaining.slice(4);
   const secondary = pickDiverseSidebar(pool, 4);
   const shownIds  = new Set(secondary.map((a) => a.id));
   const latest    = pool.filter((a) => !shownIds.has(a.id)).slice(0, 18);
