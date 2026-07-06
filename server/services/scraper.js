@@ -1,34 +1,42 @@
 /**
- * JuarezBravo.com — Scraper in-process
+ * JuarezBravo.com — Importador de noticias
  *
- * Versión del scraper que corre dentro del server Express, programada por
- * node-cron. Usa MySQL para deduplicar URLs procesadas (en lugar del
- * processed.json del scraper standalone) y publica vía HTTP a localhost.
+ * Obtiene las noticias desde la API propia de NoticiasMessenger (ya no se
+ * scrapea puentelibre.mx ni se depende de GitHub Actions). Cada noticia
+ * sigue pasando por OpenAI para: (1) verificar marca de agua en la imagen y
+ * (2) reescribir título/cuerpo antes de publicarla.
+ *
+ * Config vía env:
+ *   NEWS_API_URL    (default: https://sysatelier.online/NoticiasMessenger/API/consulta.php)
+ *   NEWS_API_TOKEN   (requerido)
+ *   NEWS_API_MEDIO   (default: PuenteLibre)
+ *   NEWS_API_LIMIT   (default: 100 — cuántas noticias trae la API por consulta)
+ *   NEWS_BATCH_SIZE  (default: 10 — cuántas se publican por ciclo, de la más antigua a la más nueva)
  */
 import OpenAI from 'openai';
 import axios from 'axios';
-import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
 import db from '../db.js';
 
-const BASE_URL                = 'https://puentelibre.mx';
-const MAX_ARTICLES_PER_SECTION = 8;
-const DELAY_MS                = 2500;
+const NEWS_API_URL   = process.env.NEWS_API_URL || 'https://sysatelier.online/NoticiasMessenger/API/consulta.php';
+const NEWS_API_MEDIO  = process.env.NEWS_API_MEDIO || 'PuenteLibre';
+const NEWS_API_LIMIT  = parseInt(process.env.NEWS_API_LIMIT, 10) || 100;
+const NEWS_BATCH_SIZE = parseInt(process.env.NEWS_BATCH_SIZE, 10) || 10;
 
-const SECTIONS = [
-  { url: `${BASE_URL}/local/`,        defaultCategory: null },
-  { url: `${BASE_URL}/deportes/`,     defaultCategory: 'deportes' },
-  { url: `${BASE_URL}/espectaculos/`, defaultCategory: 'entretenimiento' },
-  { url: `${BASE_URL}/nacional/`,     defaultCategory: 'politica' },
-  { url: `${BASE_URL}/economia/`,     defaultCategory: 'politica' },
-];
+const DELAY_MS = 2500;
+
+// Mapea el segmento de sección en la URL fuente (p.ej. puentelibre.mx/deportes/...)
+// a la categoría interna. `null` deja que la IA elija entre VALID_CATEGORIES.
+const CATEGORY_MAP = {
+  local:        null,
+  deportes:     'deportes',
+  espectaculos: 'entretenimiento',
+  nacional:     'politica',
+  economia:     'politica',
+  internacional: 'politica',
+};
 
 const VALID_CATEGORIES = ['seguridad', 'politica', 'deportes', 'entretenimiento'];
-
-const HTTP_HEADERS = {
-  'User-Agent':      'Mozilla/5.0 (compatible; JuarezBravoBot/1.0)',
-  'Accept-Language': 'es-MX,es;q=0.9',
-};
 
 const BLOCKED_IMAGE_DOMAINS = ['puentelibre.mx', 'puentelibre.com'];
 
@@ -71,78 +79,61 @@ async function markProcessed(url) {
   );
 }
 
-// ─── Scraping ─────────────────────────────────────────────────────────────────
+// ─── Obtención de noticias vía API ────────────────────────────────────────────
 
-async function getArticleLinks(sectionUrl) {
-  const { data } = await axios.get(sectionUrl, { headers: HTTP_HEADERS, timeout: 20_000 });
-  const $ = cheerio.load(data);
-  const seen = new Set();
-  const links = [];
-
-  $('a[href]').each((_, el) => {
-    let href = $(el).attr('href') || '';
-    if (!href.startsWith('http')) href = `${BASE_URL}${href}`;
-    if (
-      href.includes('puentelibre.mx') &&
-      href.split('/').filter(Boolean).length >= 4 &&
-      !/\/(tag|autor|author|page|categoria|category|\?|#)/.test(href) &&
-      !href.includes('/slugnoticia/') &&
-      !seen.has(href)
-    ) {
-      seen.add(href);
-      links.push(href);
-    }
-  });
-
-  return links.slice(0, MAX_ARTICLES_PER_SECTION);
+function sourceCategoryFromLink(link) {
+  const match = (link || '').match(/puentelibre\.mx\/([^/]+)\//);
+  return match?.[1] || 'local';
 }
 
-async function scrapeArticle(url) {
-  const { data } = await axios.get(url, { headers: HTTP_HEADERS, timeout: 20_000 });
-  const $ = cheerio.load(data);
+function cleanContenido(raw) {
+  let text = raw || '';
 
-  const title =
-    $('h1').first().text().trim() ||
-    $('meta[property="og:title"]').attr('content') ||
-    $('title').text().replace(/\s*[-|].*$/, '').trim() || '';
-
-  const ogImage  = $('meta[property="og:image"]').attr('content') || '';
-  const firstImg = $('img[src]').toArray()
-    .map((el) => $(el).attr('src') || '')
-    .find((src) => src.startsWith('http') && /\.(jpe?g|png|webp)/i.test(src)) || '';
-  const imageUrl = ogImage || firstImg;
-
-  $('nav, header, footer, aside, .sidebar, .widget, .related, .comments, .comment, script, style, noscript, .social, .share, .tags, .breadcrumb, .pagination, form, iframe, .advertisement, .ad, .banner').remove();
-
-  const contentSelectors = ['.entry-content','.post-content','.td-post-content','.article-body','.article-content','.single-content','.post-body','.content-inner','.nota-texto','.cuerpo-nota','article'];
-  let bodyParts = [];
-
-  for (const sel of contentSelectors) {
-    const container = $(sel).first();
-    if (container.length) {
-      container.find('p, blockquote').each((_, el) => {
-        const text = $(el).text().trim();
-        if (text.length > 40) bodyParts.push(text);
-      });
-      if (bodyParts.length >= 2) break;
-    }
-  }
-
-  if (bodyParts.length < 2) {
-    bodyParts = [];
-    $('p, blockquote').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text.length > 60) bodyParts.push(text);
-    });
-  }
+  // Todo lo que venga después de "Las Más Leídas" es contenido relacionado, no de la nota.
+  const idx = text.indexOf('Las Más Leídas');
+  if (idx !== -1) text = text.slice(0, idx);
 
   const seen = new Set();
-  const body = bodyParts.filter((t) => { if (seen.has(t)) return false; seen.add(t); return true; }).join('\n\n');
+  return text
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+    .filter((p) => !/^\.[a-zA-Z0-9_-]+\s*\{/.test(p))   // reglas CSS sueltas del scraping origen
+    .filter((p) => !/^https?:\/\//.test(p))
+    .filter((p) => {
+      // el primer párrafo suele repetirse (uno trae "Por: Redacción <fecha>" al final)
+      const key = p.replace(/\s*Por:\s*Redacción.*$/i, '').trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join('\n\n');
+}
 
-  const match = url.match(/puentelibre\.mx\/([^/]+)\//);
-  const sourceCategory = match?.[1] || 'local';
+async function fetchNoticias() {
+  const token = process.env.NEWS_API_TOKEN;
+  if (!token) throw new Error('NEWS_API_TOKEN no configurada');
 
-  return { title, body, imageUrl, sourceCategory, sourceUrl: url };
+  const { data } = await axios.get(NEWS_API_URL, {
+    params: { token, medio: NEWS_API_MEDIO, limit: NEWS_API_LIMIT },
+    timeout: 20_000,
+  });
+
+  if (!data?.ok) throw new Error(data?.error || 'Respuesta inválida de la API de noticias');
+
+  const noticias = (data.noticias || []).map((n) => ({
+    title:          n.titulo || '',
+    body:           cleanContenido(n.contenido),
+    imageUrl:       n.imagen || '',
+    sourceUrl:      n.link,
+    sourceCategory: sourceCategoryFromLink(n.link),
+    publishedAt:    n.fecha_pub,
+  }));
+
+  // De la más antigua a la más nueva — así se van agregando en ese orden.
+  noticias.sort((a, b) => new Date(a.publishedAt) - new Date(b.publishedAt));
+
+  return noticias;
 }
 
 // ─── Watermark detection ──────────────────────────────────────────────────────
@@ -242,7 +233,7 @@ async function publishArticle(apiClient, data) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 /**
- * Ejecuta un ciclo del scraper. Devuelve los conteos finales.
+ * Ejecuta un ciclo del importador. Devuelve los conteos finales.
  * NO captura sus propias excepciones — el caller decide qué hacer.
  */
 export async function runScraperCycle() {
@@ -259,85 +250,81 @@ export async function runScraperCycle() {
   try {
     const recent = await getRecentTitles(apiClient);
     for (const a of recent) publishedTitleSlugs.add(slugify(a.title));
-    console.log(`[Scraper] ${publishedTitleSlugs.size} títulos existentes cargados para dedup`);
+    console.log(`[Importador] ${publishedTitleSlugs.size} títulos existentes cargados para dedup`);
   } catch (err) {
-    console.warn(`[Scraper] No se pudo cargar dedup de títulos: ${err.message}`);
+    console.warn(`[Importador] No se pudo cargar dedup de títulos: ${err.message}`);
   }
 
-  for (const section of SECTIONS) {
-    let links;
+  const noticias = await fetchNoticias();
+
+  let attempted = 0;
+  for (const noticia of noticias) {
+    if (attempted >= NEWS_BATCH_SIZE) break;
+
+    const { sourceUrl } = noticia;
+    if (!sourceUrl || (await isProcessed(sourceUrl))) continue;
+
+    attempted++;
+
     try {
-      links = await getArticleLinks(section.url);
-    } catch (err) {
-      console.error(`[Scraper] Sección ${section.url} falló: ${err.message}`);
-      counts.errors++;
-      continue;
-    }
-
-    for (const url of links) {
-      if (await isProcessed(url)) continue;
-
-      try {
-        const article = await scrapeArticle(url);
-
-        if (!article.title || article.body.length < 80) {
-          await markProcessed(url);
-          counts.skipped++;
-          continue;
-        }
-
-        const titleSlug = slugify(article.title);
-        if (publishedTitleSlugs.has(titleSlug)) {
-          await markProcessed(url);
-          counts.skipped++;
-          continue;
-        }
-        publishedTitleSlugs.add(titleSlug);
-
-        if (await hasPuenteLibreWatermark(article.imageUrl, openai)) {
-          await markProcessed(url);
-          counts.skipped++;
-          await sleep(DELAY_MS);
-          continue;
-        }
-
-        const rewritten = await rewriteArticle(
-          article.title, article.body, article.sourceCategory, section.defaultCategory, openai
-        );
-
-        const slug = uniqueSlug(rewritten.title);
-        await publishArticle(apiClient, {
-          title:            rewritten.title,
-          slug,
-          excerpt:          rewritten.excerpt,
-          body:             rewritten.body,
-          cover_image:      article.imageUrl || null,
-          category:         rewritten.category,
-          status:           'published',
-          published_at:     new Date().toISOString(),
-          is_breaking_news: false,
-          is_featured:      false,
-          author:           'Redacción JuarezBravo',
-          views:            0,
-          tags:             [],
-        });
-
-        await markProcessed(url);
-        counts.published++;
-        console.log(`[Scraper] ✓ Publicado [${rewritten.category}] ${rewritten.title.slice(0, 70)}`);
-      } catch (err) {
-        console.error(`[Scraper] ✗ ${url}: ${err.message}`);
-        const isTransient =
-          ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED'].includes(err.code) ||
-          (err.response?.status >= 500 && err.response?.status < 600);
-        if (!isTransient) {
-          await markProcessed(url);
-        }
-        counts.errors++;
+      if (!noticia.title || noticia.body.length < 80) {
+        await markProcessed(sourceUrl);
+        counts.skipped++;
+        continue;
       }
 
-      await sleep(DELAY_MS);
+      const titleSlug = slugify(noticia.title);
+      if (publishedTitleSlugs.has(titleSlug)) {
+        await markProcessed(sourceUrl);
+        counts.skipped++;
+        continue;
+      }
+      publishedTitleSlugs.add(titleSlug);
+
+      if (await hasPuenteLibreWatermark(noticia.imageUrl, openai)) {
+        await markProcessed(sourceUrl);
+        counts.skipped++;
+        await sleep(DELAY_MS);
+        continue;
+      }
+
+      const defaultCategory = CATEGORY_MAP[noticia.sourceCategory] ?? null;
+      const rewritten = await rewriteArticle(
+        noticia.title, noticia.body, noticia.sourceCategory, defaultCategory, openai
+      );
+
+      const slug = uniqueSlug(rewritten.title);
+      await publishArticle(apiClient, {
+        title:            rewritten.title,
+        slug,
+        excerpt:          rewritten.excerpt,
+        body:             rewritten.body,
+        cover_image:      noticia.imageUrl || null,
+        category:         rewritten.category,
+        status:           'published',
+        published_at:     new Date().toISOString(),
+        is_breaking_news: false,
+        is_featured:      false,
+        author:           'Redacción JuarezBravo',
+        views:            0,
+        tags:             [],
+      });
+
+      await markProcessed(sourceUrl);
+      counts.published++;
+      console.log(`[Importador] ✓ Publicado [${rewritten.category}] ${rewritten.title.slice(0, 70)}`);
+    } catch (err) {
+      console.error(`[Importador] ✗ ${sourceUrl}: ${err.message}`);
+      const isTransient =
+        ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED'].includes(err.code) ||
+        (err.response?.status >= 500 && err.response?.status < 600);
+      if (!isTransient) {
+        await markProcessed(sourceUrl);
+      }
+      counts.errors++;
     }
+
+    await sleep(DELAY_MS);
   }
 
   return counts;
