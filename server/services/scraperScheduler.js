@@ -75,8 +75,8 @@ export function startScraperScheduler() {
     console.log('[Scheduler] Deshabilitado por env var SCRAPER_SCHEDULE_DISABLED');
     return;
   }
-  if (!process.env.OPENAI_API_KEY || !process.env.SCRAPER_API_KEY || !process.env.NEWS_API_TOKEN) {
-    console.log('[Scheduler] OPENAI_API_KEY, SCRAPER_API_KEY o NEWS_API_TOKEN ausentes, no se programa');
+  if (!process.env.OPENAI_API_KEY || !process.env.NEWS_API_TOKEN) {
+    console.log('[Scheduler] OPENAI_API_KEY o NEWS_API_TOKEN ausentes, no se programa');
     return;
   }
 

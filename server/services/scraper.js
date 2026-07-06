@@ -17,6 +17,7 @@ import OpenAI from 'openai';
 import axios from 'axios';
 import { createHash } from 'crypto';
 import db from '../db.js';
+import { createArticle, listRecentTitles } from './articleStore.js';
 
 const NEWS_API_URL   = process.env.NEWS_API_URL || 'https://sysatelier.online/NoticiasMessenger/API/consulta.php';
 const NEWS_API_MEDIO  = process.env.NEWS_API_MEDIO || 'PuenteLibre';
@@ -206,30 +207,6 @@ ${categoryHint}`,
   return parsed;
 }
 
-// ─── API client (publica vía localhost) ───────────────────────────────────────
-
-function buildApiClient() {
-  const port      = process.env.PORT || 3000;
-  const scraperKey = process.env.SCRAPER_API_KEY;
-  if (!scraperKey) throw new Error('SCRAPER_API_KEY no configurada');
-
-  return axios.create({
-    baseURL: `http://127.0.0.1:${port}/api`,
-    headers: { 'x-api-key': scraperKey, 'Content-Type': 'application/json' },
-    timeout: 30_000,
-  });
-}
-
-async function getRecentTitles(apiClient) {
-  const res = await apiClient.get('/articles?sort=-published_at&limit=500');
-  return res.data;
-}
-
-async function publishArticle(apiClient, data) {
-  const res = await apiClient.post('/articles', data);
-  return res.data;
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -241,14 +218,13 @@ export async function runScraperCycle() {
     throw new Error('OPENAI_API_KEY no configurada');
   }
 
-  const apiClient = buildApiClient();
-  const openai    = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const counts = { published: 0, skipped: 0, errors: 0 };
 
   const publishedTitleSlugs = new Set();
   try {
-    const recent = await getRecentTitles(apiClient);
+    const recent = await listRecentTitles();
     for (const a of recent) publishedTitleSlugs.add(slugify(a.title));
     console.log(`[Importador] ${publishedTitleSlugs.size} títulos existentes cargados para dedup`);
   } catch (err) {
@@ -294,7 +270,7 @@ export async function runScraperCycle() {
       );
 
       const slug = uniqueSlug(rewritten.title);
-      await publishArticle(apiClient, {
+      await createArticle({
         title:            rewritten.title,
         slug,
         excerpt:          rewritten.excerpt,

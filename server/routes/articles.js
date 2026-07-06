@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
-import { publishArticleToFacebook } from '../services/facebook.js';
+import { createArticle, parseRow } from '../services/articleStore.js';
 
 const router = Router();
 
@@ -20,16 +19,6 @@ function buildSort(sortParam) {
   const field = desc ? sortParam.slice(1) : sortParam;
   const col   = ALLOWED_SORT_FIELDS[field] ?? 'created_at';
   return `${col} ${desc ? 'DESC' : 'ASC'}`;
-}
-
-function parseRow(row) {
-  return {
-    ...row,
-    tags:             row.tags ? JSON.parse(row.tags) : [],
-    is_breaking_news: Boolean(row.is_breaking_news),
-    is_featured:      Boolean(row.is_featured),
-    created_date:     row.created_at, // compatibilidad con llamadas que usan created_date
-  };
 }
 
 // GET /api/articles
@@ -78,38 +67,7 @@ router.post('/:id/view', async (req, res) => {
 // POST /api/articles
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const {
-      title, slug, excerpt, body, cover_image, category, tags,
-      status, is_breaking_news, is_featured, author, published_at, views,
-    } = req.body;
-
-    const id = randomUUID();
-
-    await db.query(
-      `INSERT INTO articles
-         (id, title, slug, excerpt, body, cover_image, category, tags,
-          status, is_breaking_news, is_featured, author, published_at, views)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id, title, slug || null, excerpt || null, body || null,
-        cover_image || null, category || null,
-        JSON.stringify(tags || []),
-        status || 'draft',
-        is_breaking_news ? 1 : 0,
-        is_featured      ? 1 : 0,
-        author || null,
-        published_at || null,
-        views || 0,
-      ]
-    );
-
-    const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [id]);
-    const article = parseRow(rows[0]);
-
-    if (article.status === 'published') {
-      publishArticleToFacebook(article).catch(() => {});
-    }
-
+    const article = await createArticle(req.body);
     res.status(201).json(article);
   } catch (err) {
     console.error(err);
