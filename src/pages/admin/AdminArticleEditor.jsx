@@ -34,6 +34,7 @@ export default function AdminArticleEditor() {
   const [tagInput, setTagInput]     = useState("");
   const [uploading, setUploading]   = useState(false);
   const [error, setError]           = useState("");
+  const [coverBroken, setCoverBroken] = useState(false);
   const [slugTouched, setSlugTouch] = useState(false);
 
   const { data: existing, isLoading: loadingExisting } = useQuery({
@@ -63,6 +64,10 @@ export default function AdminArticleEditor() {
     }
   }, [form.title]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    setCoverBroken(false);
+  }, [form.cover_image]);
+
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const saveMutation = useMutation({
@@ -70,9 +75,18 @@ export default function AdminArticleEditor() {
       if (isEdit) return api.articles.update(id, payload);
       return api.articles.create(payload);
     },
-    onSuccess: () => {
+    onSuccess: (savedArticle, payload) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "articles"] });
       queryClient.invalidateQueries({ queryKey: ["articles", "published"] });
+
+      if (payload.status === "published" && savedArticle.status !== "published") {
+        setForm((f) => ({ ...f, status: savedArticle.status }));
+        setError(
+          "No se publicó: la imagen de portada no cargó o no es válida. Se guardó como borrador — corrige la imagen e intenta publicar de nuevo."
+        );
+        return;
+      }
+
       navigate("/admin/articulos");
     },
     onError: (err) => setError(err?.message || "Error al guardar"),
@@ -246,7 +260,17 @@ export default function AdminArticleEditor() {
             <h3 className="font-serif font-bold text-sm uppercase tracking-wider border-b border-border pb-2">Imagen de portada</h3>
             {form.cover_image ? (
               <div className="relative">
-                <img src={form.cover_image} alt="cover" className="w-full aspect-[16/10] object-cover" />
+                <img
+                  src={form.cover_image}
+                  alt="cover"
+                  onError={() => setCoverBroken(true)}
+                  className="w-full aspect-[16/10] object-cover"
+                />
+                {coverBroken && (
+                  <p className="mt-1 text-xs text-primary font-medium">
+                    ⚠️ Esta imagen no cargó — no se podrá publicar la nota hasta que la corrijas.
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => setField("cover_image", "")}

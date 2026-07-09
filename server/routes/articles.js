@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createArticle, parseRow } from '../services/articleStore.js';
+import { isImageUrlValid } from '../services/imageCheck.js';
 
 const router = Router();
 
@@ -83,6 +84,20 @@ router.patch('/:id', requireAuth, async (req, res) => {
       'title','slug','excerpt','body','cover_image','category','tags',
       'status','is_breaking_news','is_featured','author','published_at','views',
     ];
+
+    // Igual que al crear: no se permite dejar publicada una nota sin imagen
+    // de portada válida (o con una imagen rota) — se guarda como borrador.
+    if (req.body.status === 'published') {
+      let coverImage = req.body.cover_image;
+      if (!('cover_image' in req.body)) {
+        const [rows] = await db.query('SELECT cover_image FROM articles WHERE id = ?', [id]);
+        coverImage = rows[0]?.cover_image;
+      }
+      if (!(await isImageUrlValid(coverImage))) {
+        req.body.status = 'draft';
+      }
+    }
+
     const updates = [];
     const params  = [];
 

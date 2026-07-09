@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { publishArticleToFacebook } from './facebook.js';
 import { publishArticleToInstagram } from './instagram.js';
+import { isImageUrlValid } from './imageCheck.js';
 
 export function parseRow(row) {
   return {
@@ -22,8 +23,17 @@ export function parseRow(row) {
 export async function createArticle(data) {
   const {
     title, slug, excerpt, body, cover_image, category, tags,
-    status, is_breaking_news, is_featured, author, published_at, views,
+    is_breaking_news, is_featured, author, published_at, views,
   } = data;
+
+  let status = data.status || 'draft';
+
+  // Una nota publicada sin imagen (o con una imagen rota/inaccesible) se ve
+  // peor que una nota sin publicar — se guarda como borrador en su lugar.
+  if (status === 'published' && !(await isImageUrlValid(cover_image))) {
+    console.warn(`[Articles] "${(title || '').slice(0, 70)}" no tiene una imagen de portada válida — se guarda como borrador en vez de publicarse.`);
+    status = 'draft';
+  }
 
   const id = randomUUID();
 
@@ -36,7 +46,7 @@ export async function createArticle(data) {
       id, title, slug || null, excerpt || null, body || null,
       cover_image || null, category || null,
       JSON.stringify(tags || []),
-      status || 'draft',
+      status,
       is_breaking_news ? 1 : 0,
       is_featured      ? 1 : 0,
       author || null,

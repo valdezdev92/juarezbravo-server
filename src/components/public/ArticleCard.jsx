@@ -1,20 +1,24 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { getCategoryName, formatRelativeTime } from "@/lib/categories";
 import { Clock } from "lucide-react";
 
 export default function ArticleCard({ article, variant = "default" }) {
+  const [imgError, setImgError] = useState(false);
+
   if (!article) return null;
 
+  const hasImage = Boolean(article.cover_image) && !imgError;
   const link = `/noticias/${article.slug || article.id}`;
 
   if (variant === "hero") {
     return (
       <Link to={link} className="group block relative overflow-hidden bg-foreground h-full min-h-[420px]">
-        {article.cover_image ? (
+        {hasImage ? (
           <img
             src={article.cover_image}
             alt={article.title}
+            onError={() => setImgError(true)}
             className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-80 group-hover:scale-105 transition-all duration-500"
           />
         ) : (
@@ -54,11 +58,12 @@ export default function ArticleCard({ article, variant = "default" }) {
   if (variant === "compact") {
     return (
       <Link to={link} className="group flex gap-3 py-3 border-b border-border last:border-0">
-        {article.cover_image && (
+        {hasImage && (
           <div className="w-20 h-20 shrink-0 overflow-hidden bg-secondary">
             <img
               src={article.cover_image}
               alt={article.title}
+              onError={() => setImgError(true)}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
             />
           </div>
@@ -85,10 +90,11 @@ export default function ArticleCard({ article, variant = "default" }) {
   return (
     <Link to={link} className="group block bg-card hover:shadow-lg transition-shadow">
       <div className="aspect-[16/10] overflow-hidden bg-secondary">
-        {article.cover_image ? (
+        {hasImage ? (
           <img
             src={article.cover_image}
             alt={article.title}
+            onError={() => setImgError(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (

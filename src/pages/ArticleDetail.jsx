@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
@@ -10,6 +10,7 @@ import { Clock, User, Tag as TagIcon, Share2, Facebook, Twitter } from "lucide-r
 
 export default function ArticleDetail() {
   const { slug } = useParams();
+  const [imgError, setImgError] = useState(false);
 
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ["article", slug],
@@ -98,10 +99,11 @@ export default function ArticleDetail() {
         )}
       </div>
 
-      {article.cover_image && (
+      {article.cover_image && !imgError && (
         <img
           src={article.cover_image}
           alt={article.title}
+          onError={() => setImgError(true)}
           className="w-full aspect-[16/9] object-cover mb-6"
         />
       )}

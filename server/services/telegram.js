@@ -340,6 +340,12 @@ async function handleNuevaConfirm(chatId, session, confirmed) {
       views:            0,
       tags:             [],
     });
+    if (article.status !== 'published') {
+      return sendMessage(
+        chatId,
+        `📝 <b>Guardada como borrador</b>\nLa imagen de portada no cargó o no es válida, así que no se publicó. Corrígela desde el panel editorial y vuelve a publicarla.`
+      );
+    }
     return sendMessage(chatId, `✅ <b>Publicado</b>\n${SITE_URL}/noticias/${article.slug}`);
   } catch (err) {
     console.error('[Telegram] Error publicando nota:', err.message);

@@ -18,6 +18,7 @@ import axios from 'axios';
 import { createHash } from 'crypto';
 import db from '../db.js';
 import { createArticle, listRecentTitles } from './articleStore.js';
+import { isImageUrlValid } from './imageCheck.js';
 
 const NEWS_API_URL   = process.env.NEWS_API_URL || 'https://sysatelier.online/NoticiasMessenger/API/consulta.php';
 const NEWS_API_MEDIO  = process.env.NEWS_API_MEDIO || 'PuenteLibre';
@@ -257,6 +258,15 @@ export async function runScraperCycle() {
       }
       publishedTitleSlugs.add(titleSlug);
 
+      // Una nota sin imagen válida es mejor no publicarla — se descarta antes
+      // de gastar llamadas a OpenAI (watermark + reescritura) en balde.
+      if (!(await isImageUrlValid(noticia.imageUrl))) {
+        await markProcessed(sourceUrl);
+        counts.skipped++;
+        console.log(`[Importador] ○ Sin imagen válida, se omite: ${noticia.title.slice(0, 70)}`);
+        continue;
+      }
+
       if (await hasPuenteLibreWatermark(noticia.imageUrl, openai)) {
         await markProcessed(sourceUrl);
         counts.skipped++;
@@ -270,7 +280,7 @@ export async function runScraperCycle() {
       );
 
       const slug = uniqueSlug(rewritten.title);
-      await createArticle({
+      const article = await createArticle({
         title:            rewritten.title,
         slug,
         excerpt:          rewritten.excerpt,
@@ -287,8 +297,13 @@ export async function runScraperCycle() {
       });
 
       await markProcessed(sourceUrl);
-      counts.published++;
-      console.log(`[Importador] ✓ Publicado [${rewritten.category}] ${rewritten.title.slice(0, 70)}`);
+      if (article.status === 'published') {
+        counts.published++;
+        console.log(`[Importador] ✓ Publicado [${rewritten.category}] ${rewritten.title.slice(0, 70)}`);
+      } else {
+        counts.skipped++;
+        console.log(`[Importador] ○ Guardado como borrador (imagen no válida) [${rewritten.category}] ${rewritten.title.slice(0, 70)}`);
+      }
     } catch (err) {
       console.error(`[Importador] ✗ ${sourceUrl}: ${err.message}`);
       const isTransient =
