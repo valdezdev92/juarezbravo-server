@@ -11,18 +11,15 @@ export default function Navbar() {
     location.pathname === path || location.pathname.startsWith(path + "/");
 
   return (
-    <header className="bg-white border-b border-border sticky top-0 z-40 shadow-sm">
+    <header className="dark bg-background border-b border-border sticky top-0 z-40 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-primary text-white flex items-center justify-center font-bold font-serif text-xl">
-              J
-            </div>
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src="/logo-mark.png" alt="Juarez Bravo" className="h-9 w-auto" />
             <div className="flex flex-col leading-none">
-              <span className="font-serif font-bold text-lg tracking-tight text-foreground">
-                JuarezBravo
-                <span className="text-primary">.com</span>
+              <span className="font-sans font-black text-lg tracking-tight text-foreground uppercase">
+                Juarez <span className="text-primary">Bravo</span>
               </span>
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 Noticias de Ciudad Juárez
@@ -36,8 +33,8 @@ export default function Navbar() {
               to="/"
               className={`px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
                 location.pathname === "/"
-                  ? "text-primary border-b-2 border-primary"
-                  : "text-foreground hover:text-primary"
+                  ? "text-brand-teal border-b-2 border-brand-teal"
+                  : "text-foreground hover:text-brand-teal"
               }`}
             >
               Inicio
@@ -48,8 +45,8 @@ export default function Navbar() {
                 to={`/categoria/${cat.slug}`}
                 className={`px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
                   isActive(`/categoria/${cat.slug}`)
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-foreground hover:text-primary"
+                    ? "text-brand-teal border-b-2 border-brand-teal"
+                    : "text-foreground hover:text-brand-teal"
                 }`}
               >
                 {cat.name}
@@ -60,7 +57,7 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             <Link
               to="/buscar"
-              className="hidden sm:flex p-2 text-foreground hover:text-primary"
+              className="hidden sm:flex p-2 text-foreground hover:text-brand-teal"
               aria-label="Buscar"
             >
               <Search className="w-5 h-5" />

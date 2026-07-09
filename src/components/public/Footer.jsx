@@ -9,12 +9,10 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-primary text-white flex items-center justify-center font-bold font-serif text-xl">
-                J
-              </div>
-              <div className="font-serif font-bold text-xl">
-                JuarezBravo<span className="text-primary">.com</span>
+            <div className="flex items-center gap-2.5 mb-4">
+              <img src="/logo-mark.png" alt="Juarez Bravo" className="h-10 w-auto" />
+              <div className="font-sans font-black text-xl uppercase tracking-tight">
+                Juarez <span className="text-primary">Bravo</span>
               </div>
             </div>
             <p className="text-sm text-white/70 max-w-md leading-relaxed">
@@ -26,7 +24,7 @@ export default function Footer() {
                 <a
                   key={i}
                   href="#"
-                  className="w-9 h-9 border border-white/20 hover:bg-primary hover:border-primary flex items-center justify-center transition-colors"
+                  className="w-9 h-9 border border-white/20 hover:bg-brand-teal hover:border-brand-teal flex items-center justify-center transition-colors"
                 >
                   <Icon className="w-4 h-4" />
                 </a>
@@ -43,7 +41,7 @@ export default function Footer() {
                 <li key={cat.slug}>
                   <Link
                     to={`/categoria/${cat.slug}`}
-                    className="text-sm text-white/70 hover:text-primary transition-colors"
+                    className="text-sm text-white/70 hover:text-brand-teal transition-colors"
                   >
                     {cat.name}
                   </Link>
@@ -58,27 +56,27 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/" className="text-sm text-white/70 hover:text-primary">
+                <Link to="/" className="text-sm text-white/70 hover:text-brand-teal">
                   Inicio
                 </Link>
               </li>
               <li>
-                <Link to="/buscar" className="text-sm text-white/70 hover:text-primary">
+                <Link to="/buscar" className="text-sm text-white/70 hover:text-brand-teal">
                   Buscar
                 </Link>
               </li>
               <li>
-                <Link to="/admin" className="text-sm text-white/70 hover:text-primary">
+                <Link to="/admin" className="text-sm text-white/70 hover:text-brand-teal">
                   Panel Editorial
                 </Link>
               </li>
               <li>
-                <Link to="/privacidad" className="text-sm text-white/70 hover:text-primary">
+                <Link to="/privacidad" className="text-sm text-white/70 hover:text-brand-teal">
                   Política de Privacidad
                 </Link>
               </li>
               <li>
-                <Link to="/terminos" className="text-sm text-white/70 hover:text-primary">
+                <Link to="/terminos" className="text-sm text-white/70 hover:text-brand-teal">
                   Términos del Servicio
                 </Link>
               </li>
