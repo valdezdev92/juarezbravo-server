@@ -7,6 +7,7 @@
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { publishArticleToFacebook } from './facebook.js';
+import { publishArticleToInstagram } from './instagram.js';
 
 export function parseRow(row) {
   return {
@@ -49,6 +50,7 @@ export async function createArticle(data) {
 
   if (article.status === 'published') {
     publishArticleToFacebook(article).catch(() => {});
+    publishArticleToInstagram(article).catch(() => {});
   }
 
   return article;
