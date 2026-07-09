@@ -10,6 +10,7 @@ import authRouter     from './routes/auth.js';
 import uploadRouter   from './routes/upload.js';
 import scraperRouter  from './routes/scraper.js';
 import { startScraperScheduler } from './services/scraperScheduler.js';
+import { startImageHealthScheduler } from './services/imageHealthScheduler.js';
 import { setupTelegramWebhook } from './services/telegram.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,4 +42,5 @@ app.get('*', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ JuarezBravo server corriendo en http://localhost:${PORT}`);
   startScraperScheduler();
+  startImageHealthScheduler();
 });
