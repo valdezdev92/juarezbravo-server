@@ -4,7 +4,6 @@ function getConfig() {
   return {
     igUserId:    process.env.INSTAGRAM_USER_ID,
     accessToken: process.env.INSTAGRAM_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_TOKEN,
-    siteUrl:     process.env.SITE_URL || 'https://juarez-bravo.com',
   };
 }
 
@@ -63,34 +62,32 @@ async function waitUntilContainerReady(containerId, { timeoutMs = 30000, interva
  * artículos sin cover_image se omiten. El flujo son dos pasos: crear el
  * contenedor de medios y luego publicarlo.
  */
-export async function publishArticleToInstagram(article) {
-  const { igUserId, accessToken, siteUrl } = getConfig();
+export async function publishArticleToInstagram(post) {
+  const { igUserId, accessToken } = getConfig();
   if (!igUserId || !accessToken) {
     console.log('[Instagram] No configurado (faltan INSTAGRAM_USER_ID o INSTAGRAM_ACCESS_TOKEN)');
     return null;
   }
-  if (!article.cover_image) {
-    console.log(`[Instagram] Sin imagen de portada, se omite: "${article.title.slice(0, 60)}"`);
+  if (!post.getImage) {
+    console.log(`[Instagram] Sin imagen de portada, se omite: "${post.title.slice(0, 60)}"`);
     return null;
   }
 
-  const url     = `${siteUrl}/noticias/${article.slug}`;
-  const caption = [article.title, article.excerpt, url].filter(Boolean).join('\n\n');
-
   try {
+    const { url } = await post.getImage();
     const container = await igPost(`${igUserId}/media`, {
-      image_url: article.cover_image,
-      caption,
+      image_url: url,
+      caption: post.caption(2200),
     });
     await waitUntilContainerReady(container.id);
     const result = await igPost(`${igUserId}/media_publish`, {
       creation_id: container.id,
     });
 
-    console.log(`[Instagram] ✓ Publicado (${result.id}): "${article.title.slice(0, 80)}"`);
+    console.log(`[Instagram] ✓ Publicado (${result.id}): "${post.title.slice(0, 80)}"`);
     return result.id;
   } catch (err) {
-    console.error(`[Instagram] ✗ Error publicando "${article.title.slice(0, 60)}": ${err.message}`);
+    console.error(`[Instagram] ✗ Error publicando "${post.title.slice(0, 60)}": ${err.message}`);
     return null;
   }
 }

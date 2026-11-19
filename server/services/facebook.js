@@ -4,7 +4,6 @@ function getConfig() {
   return {
     pageId:    process.env.FACEBOOK_PAGE_ID,
     pageToken: process.env.FACEBOOK_PAGE_TOKEN,
-    siteUrl:   process.env.SITE_URL || 'https://juarez-bravo.com',
   };
 }
 
@@ -25,26 +24,28 @@ async function fbPost(path, body) {
   return data;
 }
 
-export async function publishArticleToFacebook(article) {
-  const { pageId, pageToken, siteUrl } = getConfig();
+export async function publishArticleToFacebook(post) {
+  const { pageId, pageToken } = getConfig();
   if (!pageId || !pageToken) {
     console.log('[Facebook] No configurado (faltan FACEBOOK_PAGE_ID o FACEBOOK_PAGE_TOKEN)');
     return null;
   }
 
-  const url     = `${siteUrl}/noticias/${article.slug}`;
-  const message = [article.title, article.excerpt, url].filter(Boolean).join('\n\n');
-
   try {
-    const result = article.cover_image
-      ? await fbPost(`${pageId}/photos`, { url: article.cover_image, caption: message })
-      : await fbPost(`${pageId}/feed`,   { message, link: url });
+    const message = post.caption();
+    let body = { message, link: post.url };
+    if (post.getImage) {
+      const { url } = await post.getImage();
+      const photo = await fbPost(`${pageId}/photos`, { url, published: 'false' });
+      body = { message, 'attached_media[0]': JSON.stringify({ media_fbid: photo.id }) };
+    }
 
+    const result = await fbPost(`${pageId}/feed`, body);
     const postId = result.post_id || result.id;
-    console.log(`[Facebook] ✓ Publicado (${postId}): "${article.title.slice(0, 80)}"`);
+    console.log(`[Facebook] ✓ Publicado (${postId}): "${post.title.slice(0, 80)}"`);
     return postId;
   } catch (err) {
-    console.error(`[Facebook] ✗ Error publicando "${article.title.slice(0, 60)}": ${err.message}`);
+    console.error(`[Facebook] ✗ Error publicando "${post.title.slice(0, 60)}": ${err.message}`);
     return null;
   }
 }

@@ -3,6 +3,7 @@ import db from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createArticle, parseRow } from '../services/articleStore.js';
 import { isImageUrlValid } from '../services/imageCheck.js';
+import { publishArticleOnSocialMedia } from '../services/socialPost.js';
 
 const router = Router();
 
@@ -113,11 +114,22 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (!updates.length) return res.status(400).json({ error: 'Sin campos para actualizar' });
 
     params.push(id);
-    await db.query(`UPDATE articles SET ${updates.join(', ')} WHERE id = ?`, params);
+    const update = `UPDATE articles SET ${updates.join(', ')} WHERE id = ?`;
+    let newlyPublished = false;
+    if (req.body.status === 'published') {
+      // Solo la actualización que cambia el estado debe publicar en redes.
+      const [transition] = await db.query(`${update} AND status <> 'published'`, params);
+      newlyPublished = transition.affectedRows > 0;
+    }
+    if (!newlyPublished) await db.query(update, params);
 
     const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [id]);
     if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-    res.json(parseRow(rows[0]));
+    const article = parseRow(rows[0]);
+    if (newlyPublished && article.status === 'published') {
+      void publishArticleOnSocialMedia(article);
+    }
+    res.json(article);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
