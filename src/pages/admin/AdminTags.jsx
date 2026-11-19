@@ -1,22 +1,17 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { Tag as TagIcon } from "lucide-react";
+import { articleKeys } from "@/lib/article-queries";
 
 export default function AdminTags() {
-  const { data: articles = [] } = useQuery({
-    queryKey: ["admin", "articles"],
-    queryFn: () => api.articles.list("-created_date", 500),
+  const { data: tags = [], isLoading, isError, refetch } = useQuery({
+    queryKey: articleKeys.tags,
+    queryFn: ({ signal }) => api.articles.tags(signal),
   });
-
-  const tags = useMemo(() => {
-    const counts = {};
-    articles.forEach((a) => {
-      (a.tags || []).forEach((t) => { counts[t] = (counts[t] || 0) + 1; });
-    });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [articles]);
+  if (isLoading) return <p role="status">Cargando etiquetas…</p>;
+  if (isError) return <p role="alert">No pudimos cargar las etiquetas. <button type="button" onClick={() => refetch()} className="text-primary underline">Reintentar</button></p>;
 
   return (
     <div className="space-y-6">

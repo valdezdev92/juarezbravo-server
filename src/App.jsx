@@ -5,24 +5,25 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
+import { lazy, Suspense } from 'react';
 
 // Public layout + pages
 import PublicLayout from '@/components/public/PublicLayout';
 import Home from '@/pages/Home';
-import ArticleDetail from '@/pages/ArticleDetail';
-import CategoryPage from '@/pages/CategoryPage';
-import TagPage from '@/pages/TagPage';
-import SearchPage from '@/pages/SearchPage';
-import PrivacyPolicy from '@/pages/PrivacyPolicy';
-import TermsOfService from '@/pages/TermsOfService';
+const ArticleDetail = lazy(() => import('@/pages/ArticleDetail'));
+const CategoryPage = lazy(() => import('@/pages/CategoryPage'));
+const TagPage = lazy(() => import('@/pages/TagPage'));
+const SearchPage = lazy(() => import('@/pages/SearchPage'));
+const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('@/pages/TermsOfService'));
 
 // Admin
-import AdminLayout from '@/components/admin/AdminLayout';
-import AdminDashboard from '@/pages/admin/AdminDashboard';
-import AdminArticles from '@/pages/admin/AdminArticles';
-import AdminArticleEditor from '@/pages/admin/AdminArticleEditor';
-import AdminTicker from '@/pages/admin/AdminTicker';
-import AdminTags from '@/pages/admin/AdminTags';
+const AdminLayout = lazy(() => import('@/components/admin/AdminLayout'));
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
+const AdminArticles = lazy(() => import('@/pages/admin/AdminArticles'));
+const AdminArticleEditor = lazy(() => import('@/pages/admin/AdminArticleEditor'));
+const AdminTicker = lazy(() => import('@/pages/admin/AdminTicker'));
+const AdminTags = lazy(() => import('@/pages/admin/AdminTags'));
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
           <Router>
+            <Suspense fallback={<div role="status" className="site-container py-12 text-muted-foreground">Cargando página…</div>}>
             <Routes>
               {/* Public routes */}
               <Route element={<PublicLayout />}>
@@ -54,6 +56,7 @@ function App() {
 
               <Route path="*" element={<PageNotFound />} />
             </Routes>
+            </Suspense>
           </Router>
           <Toaster />
         </QueryClientProvider>

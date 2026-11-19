@@ -12,7 +12,7 @@ import { isImageUrlValid } from './imageCheck.js';
 export function parseRow(row) {
   return {
     ...row,
-    tags:             row.tags ? JSON.parse(row.tags) : [],
+    tags:             typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []),
     is_breaking_news: Boolean(row.is_breaking_news),
     is_featured:      Boolean(row.is_featured),
     created_date:     row.created_at, // compatibilidad con llamadas que usan created_date

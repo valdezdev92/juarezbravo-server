@@ -6,6 +6,7 @@ import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { CATEGORIES, slugify } from "@/lib/categories";
 import { ArrowLeft, Save, X, Image as ImageIcon } from "lucide-react";
+import { articleKeys, invalidateArticles } from "@/lib/article-queries";
 
 const EMPTY = {
   title: "", slug: "", excerpt: "", body: "", cover_image: "",
@@ -37,18 +38,11 @@ export default function AdminArticleEditor() {
   const [coverBroken, setCoverBroken] = useState(false);
   const [slugTouched, setSlugTouch] = useState(false);
 
-  const { data: existing, isLoading: loadingExisting } = useQuery({
-    queryKey: ["admin", "article", id],
-    queryFn: async () => {
-      const cached = queryClient.getQueryData(["admin", "articles"]);
-      if (cached) {
-        const found = cached.find((a) => a.id === id);
-        if (found) return found;
-      }
-      const all = await api.articles.list("-created_date", 500);
-      return all.find((a) => a.id === id) ?? null;
-    },
+  const { data: existing, isLoading: loadingExisting, isError: loadError, refetch } = useQuery({
+    queryKey: articleKeys.adminDetail(id),
+    queryFn: ({ signal }) => api.articles.adminGet(id, signal),
     enabled: isEdit,
+    staleTime: Infinity,
   });
 
   useEffect(() => {
@@ -71,13 +65,14 @@ export default function AdminArticleEditor() {
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const saveMutation = useMutation({
+    /** @param {typeof EMPTY} payload */
     mutationFn: async (payload) => {
       if (isEdit) return api.articles.update(id, payload);
       return api.articles.create(payload);
     },
-    onSuccess: (savedArticle, payload) => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "articles"] });
-      queryClient.invalidateQueries({ queryKey: ["articles", "published"] });
+    onSuccess: async (savedArticle, payload) => {
+      queryClient.setQueryData(articleKeys.adminDetail(savedArticle.id), savedArticle);
+      await invalidateArticles(queryClient);
 
       if (payload.status === "published" && savedArticle.status !== "published") {
         setForm((f) => ({ ...f, status: savedArticle.status }));
@@ -137,6 +132,7 @@ export default function AdminArticleEditor() {
   if (isEdit && loadingExisting) {
     return <div className="text-center text-muted-foreground py-10">Cargando artículo...</div>;
   }
+  if (isEdit && loadError) return <p role="alert">No pudimos cargar el artículo. <button type="button" onClick={() => refetch()} className="text-primary underline">Reintentar</button></p>;
 
   return (
     <form onSubmit={(e) => handleSubmit(e)} className="max-w-5xl mx-auto space-y-6">

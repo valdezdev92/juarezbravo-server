@@ -1,22 +1,13 @@
 import React from "react";
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { api } from "@/api/client";
 import { CATEGORIES, getCategoryName } from "@/lib/categories";
-import ArticleCard from "@/components/public/ArticleCard";
+import ArticleFeed from "@/components/public/ArticleFeed";
 
 export default function CategoryPage() {
   const { slug } = useParams();
   const categoryName = getCategoryName(slug);
   const exists = CATEGORIES.some((c) => c.slug === slug);
-
-  const { data: articles = [], isLoading } = useQuery({
-    queryKey: ["category", slug],
-    queryFn: () =>
-      api.articles.filter({ status: "published", category: slug }, "-published_at", 50),
-    enabled: exists,
-  });
 
   return (
     <div className="site-container py-8">
@@ -37,25 +28,11 @@ export default function CategoryPage() {
         {!exists && <p className="text-sm text-muted-foreground mt-2">Esta categoría no existe.</p>}
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="animate-pulse">
-              <div className="aspect-[16/10] bg-secondary" />
-              <div className="h-4 bg-secondary mt-3 w-1/3" />
-              <div className="h-6 bg-secondary mt-2" />
-            </div>
-          ))}
-        </div>
-      ) : articles.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-muted-foreground">No hay noticias publicadas en esta categoría todavía.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {articles.map((article) => <ArticleCard key={article.id} article={article} />)}
-        </div>
-      )}
+      <ArticleFeed
+        filters={{ category: slug }}
+        enabled={exists}
+        emptyMessage="No hay noticias publicadas en esta categoría todavía."
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function StatCard({ label, value, icon: Icon, accent }) {
+export default function StatCard({ label, value, icon: Icon, accent = false }) {
   return (
     <div className="bg-white border border-border p-5">
       <div className="flex items-start justify-between">

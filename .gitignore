@@ -3,6 +3,7 @@
 .env.*
 server/uploads/*
 !server/uploads/.gitkeep
+server/image-cache/
 
 # Logs
 /logs

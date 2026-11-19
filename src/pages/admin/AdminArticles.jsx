@@ -1,37 +1,39 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { CATEGORIES, getCategoryName, formatDateTime } from "@/lib/categories";
 import { Edit, Trash2, ExternalLink, Search, PlusCircle } from "lucide-react";
+import { articleKeys, invalidateArticles } from "@/lib/article-queries";
+import { useDebounce } from "@/hooks/use-debounce";
+import PaginationControls from "@/components/PaginationControls";
 
 export default function AdminArticles() {
   const queryClient = useQueryClient();
   const [search, setSearch]           = useState("");
   const [statusFilter, setStatus]     = useState("all");
   const [categoryFilter, setCategory] = useState("all");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebounce(search, 400).trim();
+  const filters = {
+    page, limit: 25, search: debouncedSearch,
+    status: statusFilter === 'all' ? undefined : statusFilter,
+    category: categoryFilter === 'all' ? undefined : categoryFilter,
+  };
 
-  const { data: articles = [], isLoading } = useQuery({
-    queryKey: ["admin", "articles"],
-    queryFn: () => api.articles.list("-created_date", 500),
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: articleKeys.adminList(filters),
+    queryFn: ({ signal }) => api.articles.adminPage(filters, signal),
   });
+  const articles = data?.items || [];
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.articles.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "articles"] }),
+    onSuccess: async () => {
+      if (articles.length === 1 && page > 1) setPage(page - 1);
+      await invalidateArticles(queryClient);
+    },
   });
-
-  const filtered = useMemo(() => {
-    return articles.filter((a) => {
-      if (statusFilter !== "all" && a.status !== statusFilter) return false;
-      if (categoryFilter !== "all" && a.category !== categoryFilter) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        if (!(a.title || "").toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [articles, statusFilter, categoryFilter, search]);
 
   const handleDelete = (id, title) => {
     if (window.confirm(`¿Eliminar "${title}"? Esta acción no se puede deshacer.`)) {
@@ -45,7 +47,7 @@ export default function AdminArticles() {
         <div>
           <h1 className="font-serif font-bold text-3xl">Artículos</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {articles.length} artículo{articles.length !== 1 ? "s" : ""} en total
+            {data?.total ?? 0} artículo{data?.total !== 1 ? "s" : ""} con estos filtros
           </p>
         </div>
         <Link
@@ -62,14 +64,15 @@ export default function AdminArticles() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por título..."
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Buscar noticias..."
+            aria-label="Buscar noticias"
             className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border outline-none focus:border-primary"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatus(e.target.value)}
+          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
           className="px-3 py-2 text-sm bg-background border border-border outline-none focus:border-primary"
         >
           <option value="all">Todos los estados</option>
@@ -78,7 +81,7 @@ export default function AdminArticles() {
         </select>
         <select
           value={categoryFilter}
-          onChange={(e) => setCategory(e.target.value)}
+          onChange={(e) => { setCategory(e.target.value); setPage(1); }}
           className="px-3 py-2 text-sm bg-background border border-border outline-none focus:border-primary"
         >
           <option value="all">Todas las categorías</option>
@@ -100,10 +103,12 @@ export default function AdminArticles() {
           <tbody className="divide-y divide-border">
             {isLoading ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Cargando...</td></tr>
-            ) : filtered.length === 0 ? (
+            ) : isError ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center">No pudimos cargar los artículos. <button type="button" onClick={() => refetch()} className="text-primary underline">Reintentar</button></td></tr>
+            ) : articles.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No hay artículos que coincidan.</td></tr>
             ) : (
-              filtered.map((a) => (
+              articles.map((a) => (
                 <tr key={a.id} className="hover:bg-secondary/40">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 mb-0.5">
@@ -137,7 +142,7 @@ export default function AdminArticles() {
                       <Link to={`/admin/articulos/${a.id}/editar`} className="p-2 hover:text-primary" title="Editar">
                         <Edit className="w-4 h-4" />
                       </Link>
-                      <button onClick={() => handleDelete(a.id, a.title)} className="p-2 hover:text-primary" title="Eliminar">
+                      <button disabled={deleteMutation.isPending} onClick={() => handleDelete(a.id, a.title)} className="p-2 hover:text-primary disabled:opacity-50" title="Eliminar">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -148,6 +153,8 @@ export default function AdminArticles() {
           </tbody>
         </table>
       </div>
+      {deleteMutation.isError && <p role="alert" className="text-primary">No se pudo eliminar la noticia. Inténtalo de nuevo.</p>}
+      <PaginationControls page={page} hasMore={data?.hasMore ?? false} onChange={setPage} disabled={isFetching} />
     </div>
   );
 }

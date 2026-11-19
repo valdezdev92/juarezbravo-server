@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Clock } from "lucide-react";
 import { getCategoryName, formatRelativeTime } from "@/lib/categories";
+import ArticleImage from './ArticleImage';
 
 function ArticleLabels({ article, hero = false }) {
   return (
@@ -40,9 +41,11 @@ export default function ArticleCard({ article, variant = "default" }) {
   const hasImage = article.cover_image && failedImage !== article.cover_image;
   const link = `/noticias/${article.slug || article.id}`;
   const cover = (className, loading) => hasImage && (
-    <img
-      src={article.cover_image}
-      alt=""
+    <ArticleImage
+      key={article.cover_image}
+      article={article}
+      sizes={variant === 'compact' ? '68px' : variant === 'hero' ? '(min-width: 1024px) 65vw, 100vw' : '(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw'}
+      priority={variant === 'hero'}
       loading={loading}
       onError={() => setFailedImage(article.cover_image)}
       className={className}

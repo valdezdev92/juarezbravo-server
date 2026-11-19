@@ -4,62 +4,39 @@ import { requireAuth } from '../middleware/auth.js';
 import { createArticle, parseRow } from '../services/articleStore.js';
 import { isImageUrlValid } from '../services/imageCheck.js';
 import { publishArticleOnSocialMedia } from '../services/socialPost.js';
+import { getHomeArticles, listArticles } from '../services/articleQueries.js';
 
 const router = Router();
-
-const ALLOWED_SORT_FIELDS = {
-  published_at: 'published_at',
-  created_at:   'created_at',
-  created_date: 'created_at', // alias base44
-  title:        'title',
-  views:        'views',
-};
-
-function buildSort(sortParam) {
-  if (!sortParam) return 'created_at DESC';
-  const desc  = sortParam.startsWith('-');
-  const field = desc ? sortParam.slice(1) : sortParam;
-  const col   = ALLOWED_SORT_FIELDS[field] ?? 'created_at';
-  return `${col} ${desc ? 'DESC' : 'ASC'}`;
-}
 
 // GET /api/articles
 router.get('/', async (req, res) => {
   try {
-    const { status, category, slug, sort, limit, search, tag } = req.query;
-    const conditions = [];
-    const params     = [];
-
-    if (status)   { conditions.push('status = ?');   params.push(status); }
-    if (category) { conditions.push('category = ?'); params.push(category); }
-    if (slug)     { conditions.push('slug = ?');     params.push(slug); }
-    if (tag)      { conditions.push("JSON_CONTAINS(tags, ?)"); params.push(JSON.stringify(tag)); }
-    if (search) {
-      conditions.push('(title LIKE ? OR excerpt LIKE ? OR body LIKE ?)');
-      const q = `%${search}%`;
-      params.push(q, q, q);
-    }
-
-    const where   = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const orderBy = `ORDER BY ${buildSort(sort)}`;
-    const lim     = Math.min(parseInt(limit) || 100, 2000);
-
-    const [rows] = await db.query(
-      `SELECT * FROM articles ${where} ${orderBy} LIMIT ${lim}`,
-      params
-    );
-
-    res.json(rows.map(parseRow));
+    res.json(await listArticles(req.query));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
+router.get('/home', async (_req, res, next) => {
+  try { res.json(await getHomeArticles()); } catch (err) { next(err); }
+});
+
+router.get('/:slug', async (req, res, next) => {
+  try {
+    const { slug } = req.params;
+    const [rows] = await db.query(
+      `SELECT * FROM articles WHERE status = 'published' AND (slug = ? OR id = ?) LIMIT 1`, [slug, slug]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Artículo no encontrado' });
+    res.json(parseRow(rows[0]));
+  } catch (err) { next(err); }
+});
+
 // POST /api/articles/:id/view  (sin auth — incrementa contador de vistas)
 router.post('/:id/view', async (req, res) => {
   try {
-    await db.query('UPDATE articles SET views = views + 1 WHERE id = ?', [req.params.id]);
+    await db.query("UPDATE articles SET views = views + 1 WHERE id = ? AND status = 'published'", [req.params.id]);
     res.json({ success: true });
   } catch {
     res.json({ success: true });

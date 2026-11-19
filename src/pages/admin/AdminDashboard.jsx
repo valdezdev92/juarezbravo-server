@@ -5,11 +5,12 @@ import { api } from "@/api/client";
 import StatCard from "@/components/admin/StatCard";
 import { Newspaper, FileEdit, Megaphone, Eye, ExternalLink, Edit } from "lucide-react";
 import { getCategoryName, formatRelativeTime } from "@/lib/categories";
+import { articleKeys } from "@/lib/article-queries";
 
 export default function AdminDashboard() {
-  const { data: articles = [] } = useQuery({
-    queryKey: ["admin", "articles"],
-    queryFn: () => api.articles.list("-created_date", 200),
+  const { data: stats, isLoading, isError, refetch } = useQuery({
+    queryKey: articleKeys.stats,
+    queryFn: ({ signal }) => api.articles.stats(signal),
   });
 
   const { data: ticker = [] } = useQuery({
@@ -17,11 +18,9 @@ export default function AdminDashboard() {
     queryFn: () => api.ticker.list("order", 50),
   });
 
-  const published  = articles.filter((a) => a.status === "published");
-  const drafts     = articles.filter((a) => a.status !== "published");
-  const breaking   = articles.filter((a) => a.is_breaking_news);
-  const totalViews = articles.reduce((acc, a) => acc + (a.views || 0), 0);
-  const recent     = articles.slice(0, 6);
+  const recent = stats?.recent || [];
+  if (isLoading) return <p role="status">Cargando resumen…</p>;
+  if (isError) return <p role="alert">No pudimos cargar el resumen. <button type="button" onClick={() => refetch()} className="text-primary underline">Reintentar</button></p>;
 
   return (
     <div className="space-y-8">
@@ -39,10 +38,10 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Publicadas"     value={published.length}  icon={Newspaper} accent />
-        <StatCard label="Borradores"     value={drafts.length}     icon={FileEdit} />
-        <StatCard label="Urgentes"       value={breaking.length}   icon={Megaphone} />
-        <StatCard label="Vistas Totales" value={totalViews}        icon={Eye} />
+        <StatCard label="Publicadas"     value={stats.published}  icon={Newspaper} accent />
+        <StatCard label="Borradores"     value={stats.drafts}     icon={FileEdit} />
+        <StatCard label="Urgentes"       value={stats.breaking}   icon={Megaphone} />
+        <StatCard label="Vistas Totales" value={stats.totalViews} icon={Eye} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

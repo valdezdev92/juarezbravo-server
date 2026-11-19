@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -7,6 +7,7 @@ import { api } from "@/api/client";
 import ArticleCard from "@/components/public/ArticleCard";
 import SectionHeader from "@/components/public/SectionHeader";
 import { CATEGORIES } from "@/lib/categories";
+import { articleKeys } from "@/lib/article-queries";
 
 function pickHero(articles) {
   const now = Date.now();
@@ -41,19 +42,12 @@ function pickDiverseSidebar(pool, count = 4) {
 }
 
 export default function Home() {
-  const { data: articles = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ["articles", "published"],
-    queryFn: () => api.articles.filter({ status: "published" }, "-published_at", 100),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: articleKeys.home,
+    queryFn: ({ signal }) => api.articles.home(signal),
   });
-
-  const categoryQueries = useQueries({
-    queries: CATEGORIES.map((category) => ({
-      queryKey: ["articles", "cat", category.slug],
-      queryFn: () =>
-        api.articles.filter({ status: "published", category: category.slug }, "-published_at", 5),
-      staleTime: 5 * 60 * 1000,
-    })),
-  });
+  const articles = data?.articles || [];
+  const categories = data?.categories || {};
 
   const featured = pickHero(articles);
   const remaining = articles.filter((article) => article.id !== featured?.id);
@@ -142,10 +136,10 @@ export default function Home() {
         </section>
       )}
 
-      {categoryQueries.some((query) => query.data?.length > 0) && (
+      {Object.values(categories).some((items) => items.length > 0) && (
         <div className="grid gap-x-8 gap-y-10 md:grid-cols-2">
-          {CATEGORIES.map((category, index) => {
-            const [lead, ...rest] = categoryQueries[index].data ?? [];
+          {CATEGORIES.map((category) => {
+            const [lead, ...rest] = categories[category.slug] ?? [];
             if (!lead) return null;
 
             return (

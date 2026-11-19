@@ -16,10 +16,12 @@ export default function AdminTicker() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin", "ticker"] });
 
   const createMutation = useMutation({
+    /** @param {{headline: string, url: string, is_active: boolean, order: number}} data */
     mutationFn: (data) => api.ticker.create(data),
     onSuccess: invalidate,
   });
   const updateMutation = useMutation({
+    /** @param {{id: string, data: {order?: number, is_active?: boolean}}} update */
     mutationFn: ({ id, data }) => api.ticker.update(id, data),
     onSuccess: invalidate,
   });

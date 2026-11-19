@@ -5,6 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import articlesRouter from './routes/articles.js';
+import adminArticlesRouter from './routes/adminArticles.js';
+import imagesRouter from './routes/images.js';
 import tickerRouter   from './routes/ticker.js';
 import authRouter     from './routes/auth.js';
 import uploadRouter   from './routes/upload.js';
@@ -24,10 +26,17 @@ app.use(express.json({ limit: '10mb' }));
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth',     authRouter);
 app.use('/api/articles', articlesRouter);
+app.use('/api/admin/articles', adminArticlesRouter);
+app.use('/api/images', imagesRouter);
 app.use('/api/ticker',   tickerRouter);
 app.use('/api/upload',   uploadRouter);
 app.use('/api/scraper',  scraperRouter);
 setupTelegramWebhook(app);
+
+app.use('/api', (err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: 'No se pudo completar la solicitud' });
+});
 
 // ── Archivos subidos (imágenes) ───────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

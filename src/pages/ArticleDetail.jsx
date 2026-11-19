@@ -3,31 +3,28 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import DOMPurify from "dompurify";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
+import { articleKeys } from "@/lib/article-queries";
 import { getCategoryName, formatDateTime } from "@/lib/categories";
 import ArticleCard from "@/components/public/ArticleCard";
+import ArticleImage from "@/components/public/ArticleImage";
 import { Clock, User, Tag as TagIcon, Share2, Facebook, Twitter } from "lucide-react";
 
 export default function ArticleDetail() {
   const { slug } = useParams();
-  const [imgError, setImgError] = useState(false);
+  const [failedImage, setFailedImage] = useState(null);
 
-  const { data: articles = [], isLoading } = useQuery({
-    queryKey: ["article", slug],
-    queryFn: () => api.articles.filter({ slug }, "-published_at", 1),
+  const { data: article, isLoading, isError, error, refetch } = useQuery({
+    queryKey: articleKeys.detail(slug),
+    queryFn: ({ signal }) => api.articles.get(slug, signal),
+    retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 1,
   });
 
-  const article = articles[0];
-
   const { data: related = [] } = useQuery({
-    queryKey: ["related", article?.category, article?.id],
-    queryFn: async () => {
-      const all = await api.articles.filter(
-        { status: "published", category: article.category },
-        "-published_at",
-        4
-      );
-      return all.filter((a) => a.id !== article.id).slice(0, 3);
+    queryKey: articleKeys.related(article?.category, article?.id),
+    queryFn: async ({ signal }) => {
+      const result = await api.articles.page({ category: article.category, exclude: article.id, limit: 3 }, signal);
+      return result.items;
     },
     enabled: !!article,
   });
@@ -49,9 +46,11 @@ export default function ArticleDetail() {
   }
 
   if (!article) {
+    const unavailable = isError && !(error instanceof ApiError && error.status === 404);
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <h1 className="font-serif font-bold text-3xl mb-4">Artículo no encontrado</h1>
+        <h1 className="font-serif font-bold text-3xl mb-4">{unavailable ? 'No pudimos cargar la noticia' : 'Artículo no encontrado'}</h1>
+        {unavailable && <button type="button" onClick={() => refetch()} className="mb-4 block w-full text-primary hover:underline">Volver a intentar</button>}
         <Link to="/" className="text-primary hover:underline">← Volver al inicio</Link>
       </div>
     );
@@ -99,11 +98,15 @@ export default function ArticleDetail() {
         )}
       </div>
 
-      {article.cover_image && !imgError && (
-        <img
-          src={article.cover_image}
+      {article.cover_image && failedImage !== article.cover_image && (
+        <ArticleImage
+          key={article.cover_image}
+          article={article}
+          sizes="(min-width: 768px) 736px, 100vw"
+          loading="eager"
+          priority
           alt={article.title}
-          onError={() => setImgError(true)}
+          onError={() => setFailedImage(article.cover_image)}
           className="w-full aspect-[16/9] object-cover mb-6"
         />
       )}
