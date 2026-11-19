@@ -52,7 +52,7 @@ export default function Navbar() {
         <div className="site-container">
           <div className="flex min-h-[72px] items-center justify-between gap-4 sm:min-h-[88px]">
             <Link to="/" onClick={closeMenu} className="flex shrink-0 items-center gap-2.5 sm:gap-3">
-              <img src="/logo-mark.png" alt="" width="60" height="60" className="size-11 sm:size-[60px]" />
+              <img src="/juarez-bravo-logo-mark.png" alt="" width="60" height="60" className="size-11 sm:size-[60px]" />
               <span className="font-display text-[26px] uppercase leading-none sm:text-[32px]">
                 Juárez <span className="text-primary">Bravo</span>
               </span>

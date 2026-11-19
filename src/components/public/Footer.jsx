@@ -17,7 +17,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-4">
           <div className="col-span-2">
             <Link to="/" className="inline-flex items-center gap-3">
-              <img src="/logo-mark.png" alt="" width="60" height="60" loading="lazy" />
+              <img src="/juarez-bravo-logo-mark.png" alt="" width="60" height="60" loading="lazy" />
               <span className="font-display text-[32px] uppercase leading-none">Juárez Bravo</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-background/75">

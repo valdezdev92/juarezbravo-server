@@ -91,10 +91,10 @@ export default function ArticleCard({ article, variant = "default" }) {
   }
 
   return (
-    <Link to={link} className="group flex h-full flex-col border border-border bg-card transition-colors hover:border-primary/60">
+    <Link to={link} className="group flex min-w-0 flex-col border border-border bg-card transition-colors hover:border-primary/60">
       <div className="aspect-[16/10] overflow-hidden bg-foreground">
         {hasImage ? cover("size-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105", "lazy") : (
-          <img src="/logo-mark.png" alt="" loading="lazy" className="mx-auto h-full w-auto object-contain" />
+          <img src="/juarez-bravo-logo-mark.png" alt="" loading="lazy" className="mx-auto h-full w-auto object-contain" />
         )}
       </div>
       <div className="flex flex-1 flex-col p-4">
