@@ -1,71 +1,61 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 97.3%;
-    --foreground: 0 0% 7%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 7%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 7%;
-    --primary: 357 85% 33%;
+    --background: 40 32% 95%;
+    --foreground: 216 45% 13%;
+    --card: 42 38% 98%;
+    --card-foreground: 216 45% 13%;
+    --popover: 42 38% 98%;
+    --popover-foreground: 216 45% 13%;
+    --primary: 357 78% 38%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 94%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 94%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 357 85% 33%;
-    --accent-foreground: 0 0% 100%;
+    --secondary: 38 25% 90%;
+    --secondary-foreground: 216 45% 13%;
+    --muted: 38 25% 90%;
+    --muted-foreground: 217 14% 37%;
+    --accent: 38 25% 90%;
+    --accent-foreground: 216 45% 13%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 357 85% 33%;
+    --border: 38 20% 84%;
+    --input: 38 20% 84%;
+    --ring: 357 78% 38%;
     --radius: 0.25rem;
     --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
     --font-serif: 'IBM Plex Serif', Georgia, serif;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 15%;
-    --sidebar-primary: 357 85% 33%;
+    --font-display: 'Anton', Impact, 'Arial Narrow', sans-serif;
+    --sidebar-background: 42 38% 98%;
+    --sidebar-foreground: 216 45% 13%;
+    --sidebar-primary: 357 78% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 96%;
-    --sidebar-accent-foreground: 357 85% 33%;
-    --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 357 85% 33%;
-
-    /* Acento "gema" del logo — turquesa oscuro, legible sobre fondo claro */
-    --brand-teal: 178 90% 24%;
-    --brand-teal-foreground: 0 0% 100%;
+    --sidebar-accent: 38 25% 90%;
+    --sidebar-accent-foreground: 216 45% 13%;
+    --sidebar-border: 38 20% 84%;
+    --sidebar-ring: 357 78% 38%;
+    --brand-red: 357 74% 50%;
   }
 
   .dark {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 357 88% 45%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 357 88% 45%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 357 88% 45%;
-
-    /* Acento "gema" del logo — turquesa brillante sobre fondos oscuros */
-    --brand-teal: 177 80% 45%;
-    --brand-teal-foreground: 0 0% 7%;
+    --background: 216 45% 13%;
+    --foreground: 40 32% 95%;
+    --card: 216 37% 17%;
+    --card-foreground: 40 32% 95%;
+    --popover: 216 37% 17%;
+    --popover-foreground: 40 32% 95%;
+    --primary: 357 84% 72%;
+    --primary-foreground: 216 45% 13%;
+    --secondary: 216 30% 22%;
+    --secondary-foreground: 40 32% 95%;
+    --muted: 216 30% 22%;
+    --muted-foreground: 216 14% 72%;
+    --accent: 216 30% 22%;
+    --accent-foreground: 40 32% 95%;
+    --border: 216 27% 28%;
+    --input: 216 27% 28%;
+    --ring: 357 84% 72%;
   }
 }
 
@@ -96,19 +86,61 @@
   }
 }
 
-/* Ticker marquee animation */
+@layer components {
+  .site-container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .ticker-viewport {
+    container-type: inline-size;
+  }
+
+  .ticker-list {
+    min-width: 100cqw;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ticker-track {
+      animation: ticker-scroll 60s linear infinite;
+    }
+
+    .ticker-viewport:is(:hover, :focus-visible) .ticker-track {
+      animation-play-state: paused;
+    }
+  }
+
+  .brand-cover {
+    @apply w-full overflow-hidden border-b-4 border-brand-red bg-foreground;
+    aspect-ratio: 2.35;
+  }
+
+  .brand-cover img {
+    @apply block w-full object-cover;
+    /* Oculta la franja inferior de 53 px de la portada en móvil. */
+    height: calc(100% * 487 / 434);
+    object-position: 23% 36%;
+  }
+
+  @media (min-width: 640px) {
+    .brand-cover {
+      aspect-ratio: 3.3;
+    }
+
+    .brand-cover img {
+      height: 100%;
+      object-position: center 34%;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .brand-cover {
+      aspect-ratio: 4.05;
+    }
+  }
+}
+
 @keyframes ticker-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.ticker-track {
-  animation: ticker-scroll 60s linear infinite;
-  will-change: transform;
-}
-
-.ticker-track:hover {
-  animation-play-state: paused;
+  to { transform: translateX(-50%); }
 }
 
 /* Rich text content */

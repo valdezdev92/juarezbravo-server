@@ -1,95 +1,57 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { CATEGORIES } from "@/lib/categories";
-import { Facebook, Twitter, Instagram, Youtube } from "lucide-react";
+
+const siteLinks = [
+  { to: "/", label: "Inicio" },
+  { to: "/buscar", label: "Buscar" },
+  { to: "/admin", label: "Panel editorial" },
+  { to: "/privacidad", label: "Política de privacidad" },
+  { to: "/terminos", label: "Términos del servicio" },
+];
 
 export default function Footer() {
   return (
-    <footer className="bg-foreground text-white mt-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="md:col-span-2">
-            <div className="flex items-center gap-2.5 mb-4">
-              <img src="/logo-mark.png" alt="Juarez Bravo" className="h-10 w-auto" />
-              <div className="font-sans font-black text-xl uppercase tracking-tight">
-                Juarez <span className="text-primary">Bravo</span>
-              </div>
-            </div>
-            <p className="text-sm text-white/70 max-w-md leading-relaxed">
-              Tu fuente de noticias confiable en Ciudad Juárez. Cobertura local de
-              seguridad, política, sociedad, deportes y entretenimiento las 24 horas.
+    <footer className="mt-16 border-t-4 border-brand-red bg-foreground text-background">
+      <div className="site-container py-10 sm:py-12">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-4">
+          <div className="col-span-2">
+            <Link to="/" className="inline-flex items-center gap-3">
+              <img src="/logo-mark.png" alt="" width="60" height="60" loading="lazy" />
+              <span className="font-display text-[32px] uppercase leading-none">Juárez Bravo</span>
+            </Link>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-background/75">
+              Noticias de Ciudad Juárez, Chihuahua.
             </p>
-            <div className="flex gap-3 mt-6">
-              {[Facebook, Twitter, Instagram, Youtube].map((Icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="w-9 h-9 border border-white/20 hover:bg-brand-teal hover:border-brand-teal flex items-center justify-center transition-colors"
-                >
-                  <Icon className="w-4 h-4" />
-                </a>
-              ))}
-            </div>
           </div>
-
           <div>
-            <h4 className="font-bold uppercase text-sm tracking-wider mb-4 text-white">
-              Secciones
-            </h4>
+            <h2 className="mb-3 font-sans text-xs font-bold uppercase tracking-widest">Secciones</h2>
             <ul className="space-y-2">
-              {CATEGORIES.map((cat) => (
-                <li key={cat.slug}>
-                  <Link
-                    to={`/categoria/${cat.slug}`}
-                    className="text-sm text-white/70 hover:text-brand-teal transition-colors"
-                  >
-                    {cat.name}
+              {CATEGORIES.map(({ slug, name }) => (
+                <li key={slug}>
+                  <Link to={`/categoria/${slug}`} className="text-sm text-background/75 hover:text-background hover:underline">
+                    {name}
                   </Link>
                 </li>
               ))}
             </ul>
           </div>
-
           <div>
-            <h4 className="font-bold uppercase text-sm tracking-wider mb-4 text-white">
-              Sitio
-            </h4>
+            <h2 className="mb-3 font-sans text-xs font-bold uppercase tracking-widest">Sitio</h2>
             <ul className="space-y-2">
-              <li>
-                <Link to="/" className="text-sm text-white/70 hover:text-brand-teal">
-                  Inicio
-                </Link>
-              </li>
-              <li>
-                <Link to="/buscar" className="text-sm text-white/70 hover:text-brand-teal">
-                  Buscar
-                </Link>
-              </li>
-              <li>
-                <Link to="/admin" className="text-sm text-white/70 hover:text-brand-teal">
-                  Panel Editorial
-                </Link>
-              </li>
-              <li>
-                <Link to="/privacidad" className="text-sm text-white/70 hover:text-brand-teal">
-                  Política de Privacidad
-                </Link>
-              </li>
-              <li>
-                <Link to="/terminos" className="text-sm text-white/70 hover:text-brand-teal">
-                  Términos del Servicio
-                </Link>
-              </li>
+              {siteLinks.map(({ to, label }) => (
+                <li key={to}>
+                  <Link to={to} className="text-sm text-background/75 hover:text-background hover:underline">
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
-
-        <div className="border-t border-white/10 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-white/50">
-          <span>
-            © {new Date().getFullYear()} JuarezBravo.com — Todos los derechos reservados.
-          </span>
-          <span>Hecho en Ciudad Juárez, Chihuahua.</span>
-        </div>
+        <p className="mt-9 border-t border-background/20 pt-5 text-xs text-background/70">
+          © {new Date().getFullYear()} Juárez Bravo. Todos los derechos reservados.
+        </p>
       </div>
     </footer>
   );

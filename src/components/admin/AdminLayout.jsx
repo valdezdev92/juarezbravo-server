@@ -36,9 +36,9 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="max-w-md w-full bg-white border border-border p-8">
         <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-primary text-white mx-auto flex items-center justify-center font-serif font-bold text-2xl mb-4">J</div>
+          <img src="/logo-mark.png" alt="Juárez Bravo" width="88" height="88" className="mx-auto mb-4" />
           <h1 className="font-serif font-bold text-2xl mb-1">Panel Editorial</h1>
-          <p className="text-sm text-muted-foreground">Inicia sesión para administrar JuarezBravo.com</p>
+          <p className="text-sm text-muted-foreground">Inicia sesión para administrar Juárez Bravo.</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
@@ -103,9 +103,9 @@ export default function AdminLayout() {
         className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:sticky top-0 left-0 h-screen w-64 bg-white border-r border-sidebar-border z-40 transition-transform flex flex-col`}
       >
         <Link to="/admin" className="flex items-center gap-2 p-5 border-b border-sidebar-border">
-          <div className="w-9 h-9 bg-primary text-white flex items-center justify-center font-serif font-bold">J</div>
+          <img src="/logo-mark.png" alt="" width="44" height="44" />
           <div className="leading-tight">
-            <div className="font-serif font-bold text-sm">JuarezBravo</div>
+            <div className="font-display text-lg uppercase">Juárez Bravo</div>
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Panel Editorial</div>
           </div>
         </Link>
@@ -151,7 +151,10 @@ export default function AdminLayout() {
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
-          <span className="font-serif font-bold">JuarezBravo<span className="text-primary">.com</span></span>
+          <Link to="/admin" className="flex items-center gap-2 font-display text-lg uppercase">
+            <img src="/logo-mark.png" alt="" width="32" height="32" />
+            Juárez Bravo
+          </Link>
           <span className="w-9" />
         </header>
         <main className="flex-1 p-4 sm:p-6 lg:p-8">

@@ -7,6 +7,7 @@ module.exports = {
 		fontFamily: {
 			sans: ['var(--font-sans)'],
 			serif: ['var(--font-serif)'],
+			display: ['var(--font-display)'],
 		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -44,10 +45,7 @@ module.exports = {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
-  			'brand-teal': {
-  				DEFAULT: 'hsl(var(--brand-teal))',
-  				foreground: 'hsl(var(--brand-teal-foreground))'
-  			},
+			'brand-red': 'hsl(var(--brand-red) / <alpha-value>)',
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',

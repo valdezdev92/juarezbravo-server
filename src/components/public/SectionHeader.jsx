@@ -1,19 +1,13 @@
 import React from "react";
 
-export default function SectionHeader({ title, subtitle, accent = true }) {
+export default function SectionHeader({ title, id, children }) {
   return (
-    <div className="flex items-end justify-between border-b-2 border-foreground pb-2 mb-6">
-      <div className="flex items-center gap-3">
-        {accent && <span className="w-1.5 h-7 bg-primary" />}
-        <div>
-          <h2 className="font-serif font-bold text-2xl tracking-tight uppercase">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-          )}
-        </div>
-      </div>
+    <div className="mb-5 flex items-center justify-between gap-4 border-b border-border pb-2.5 sm:mb-6">
+      <h2 id={id} className="flex items-center gap-3 font-display text-[28px] uppercase leading-tight sm:text-[34px]">
+        <span aria-hidden="true" className="h-6 w-1 shrink-0 bg-brand-red" />
+        {title}
+      </h2>
+      {children}
     </div>
   );
 }

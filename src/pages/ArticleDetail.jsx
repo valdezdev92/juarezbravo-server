@@ -62,7 +62,7 @@ export default function ArticleDetail() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
       <Helmet>
-        <title>{article.title} | JuarezBravo.com</title>
+        <title>{article.title} | Juárez Bravo</title>
         <meta name="description" content={article.excerpt || article.title} />
         <meta property="og:title" content={article.title} />
         <meta property="og:description" content={article.excerpt || ""} />
@@ -82,7 +82,7 @@ export default function ArticleDetail() {
         )}
       </div>
 
-      <h1 className="font-serif font-bold text-3xl sm:text-4xl leading-tight mb-4">
+      <h1 className="mb-4 break-words font-serif text-3xl font-bold leading-tight sm:text-5xl">
         {article.title}
       </h1>
 
@@ -109,7 +109,7 @@ export default function ArticleDetail() {
       )}
 
       {article.excerpt && (
-        <p className="text-lg font-medium text-muted-foreground mb-6 leading-relaxed border-l-4 border-primary pl-4">
+        <p className="text-lg font-medium text-muted-foreground mb-6 leading-relaxed border-l-4 border-brand-red pl-4">
           {article.excerpt}
         </p>
       )}

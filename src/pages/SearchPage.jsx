@@ -20,11 +20,11 @@ export default function SearchPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       <Helmet>
-        <title>{query ? `"${query}" — Buscar` : "Buscar"} | JuarezBravo.com</title>
+        <title>{query ? `"${query}" — Buscar` : "Buscar"} | Juárez Bravo</title>
         <meta name="robots" content="noindex" />
       </Helmet>
-      <h1 className="font-serif font-bold text-4xl mb-6 flex items-center gap-3">
-        <span className="w-2 h-10 bg-primary" />
+      <h1 className="font-display text-4xl uppercase mb-6 flex items-center gap-3">
+        <span className="h-8 w-1 shrink-0 bg-brand-red" />
         Buscar
       </h1>
 
@@ -35,6 +35,7 @@ export default function SearchPage() {
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          aria-label="Buscar por titular"
           placeholder="¿Qué noticias buscas?"
           className="w-full bg-white border border-border pl-12 pr-4 py-4 text-lg font-serif outline-none focus:border-primary"
         />

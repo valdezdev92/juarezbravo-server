@@ -15,18 +15,18 @@ export default function TagPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div className="site-container py-8">
       <Helmet>
-        <title>#{slug} | JuarezBravo.com</title>
-        <meta name="description" content={`Noticias etiquetadas con #${slug} en JuarezBravo.com`} />
-        <meta property="og:title" content={`#${slug} | JuarezBravo.com`} />
+        <title>#{slug} | Juárez Bravo</title>
+        <meta name="description" content={`Noticias etiquetadas con #${slug} en Juárez Bravo`} />
+        <meta property="og:title" content={`#${slug} | Juárez Bravo`} />
       </Helmet>
       <div className="border-b-2 border-foreground pb-4 mb-8">
         <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
           <Link to="/" className="hover:text-primary">Inicio</Link> / Etiqueta
         </div>
-        <h1 className="font-serif font-bold text-4xl tracking-tight flex items-center gap-3">
-          <span className="w-2 h-10 bg-primary" />
+        <h1 className="font-display text-4xl uppercase tracking-tight flex items-center gap-3">
+          <span className="h-8 w-1 shrink-0 bg-brand-red" />
           #{slug}
         </h1>
       </div>

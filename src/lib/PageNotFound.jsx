@@ -1,31 +1,22 @@
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from "react-router-dom";
 
 export default function PageNotFound() {
-  const location = useLocation();
-  const pageName = location.pathname.substring(1);
+  const { pathname } = useLocation();
+  const pageName = pathname.substring(1);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-      <div className="max-w-md w-full text-center space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-7xl font-light text-slate-300">404</h1>
-          <div className="h-0.5 w-16 bg-slate-200 mx-auto" />
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-2xl font-medium text-slate-800">Página no encontrada</h2>
-          <p className="text-slate-600 leading-relaxed">
-            La página <span className="font-medium text-slate-700">"{pageName}"</span> no existe en este sitio.
-          </p>
-        </div>
-        <div className="pt-6">
-          <button
-            onClick={() => window.location.href = '/'}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            ← Ir al inicio
-          </button>
-        </div>
+    <main className="grid min-h-screen place-items-center bg-background px-4 py-10">
+      <div className="w-full max-w-md border-t-4 border-brand-red bg-card px-6 py-10 text-center sm:px-10">
+        <img src="/logo-mark.png" alt="Juárez Bravo" width="88" height="88" className="mx-auto mb-6" />
+        <p className="font-display text-5xl text-primary">404</p>
+        <h1 className="mt-3 font-serif text-2xl font-bold">Página no encontrada</h1>
+        <p className="mt-3 break-words text-sm text-muted-foreground">
+          La página «{pageName}» no existe en este sitio.
+        </p>
+        <Link to="/" className="mt-6 inline-block bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+          ← Volver al inicio
+        </Link>
       </div>
-    </div>
+    </main>
   );
 }

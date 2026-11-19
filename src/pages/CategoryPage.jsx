@@ -19,19 +19,19 @@ export default function CategoryPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div className="site-container py-8">
       <Helmet>
-        <title>{categoryName} | JuarezBravo.com</title>
-        <meta name="description" content={`Noticias de ${categoryName} en Ciudad Juárez — JuarezBravo.com`} />
-        <meta property="og:title" content={`${categoryName} | JuarezBravo.com`} />
+        <title>{categoryName} | Juárez Bravo</title>
+        <meta name="description" content={`Noticias de ${categoryName} en Ciudad Juárez — Juárez Bravo`} />
+        <meta property="og:title" content={`${categoryName} | Juárez Bravo`} />
         <meta property="og:description" content={`Noticias de ${categoryName} en Ciudad Juárez`} />
       </Helmet>
       <div className="border-b-2 border-foreground pb-4 mb-8">
         <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
           <Link to="/" className="hover:text-primary">Inicio</Link>{" / "}<span>Sección</span>
         </div>
-        <h1 className="font-serif font-bold text-4xl sm:text-5xl tracking-tight flex items-center gap-3">
-          <span className="w-2 h-10 bg-primary" />
+        <h1 className="font-display text-4xl uppercase sm:text-5xl tracking-tight flex items-center gap-3">
+          <span className="h-8 w-1 shrink-0 bg-brand-red" />
           {categoryName}
         </h1>
         {!exists && <p className="text-sm text-muted-foreground mt-2">Esta categoría no existe.</p>}

@@ -1,107 +1,120 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { Menu, Search, X } from "lucide-react";
 import { CATEGORIES } from "@/lib/categories";
-import { Menu, X, Search } from "lucide-react";
+
+const sections = [
+  { to: "/", label: "Inicio" },
+  ...CATEGORIES.map(({ slug, name }) => ({ to: `/categoria/${slug}`, label: name })),
+];
+
+const shortEditionDate = new Intl.DateTimeFormat("es-MX", {
+  dateStyle: "long",
+  timeZone: "America/Ciudad_Juarez",
+});
+
+const editionDate = new Intl.DateTimeFormat("es-MX", {
+  dateStyle: "full",
+  timeZone: "America/Ciudad_Juarez",
+});
 
 export default function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-
-  const isActive = (path) =>
-    location.pathname === path || location.pathname.startsWith(path + "/");
+  const today = new Date();
+  const [openMenuKey, setOpenMenuKey] = useState(null);
+  const mobileOpen = openMenuKey === location.key;
+  const closeMenu = () => setOpenMenuKey(null);
 
   return (
-    <header className="dark bg-background border-b border-border sticky top-0 z-40 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5">
-            <img src="/logo-mark.png" alt="Juarez Bravo" className="h-9 w-auto" />
-            <div className="flex flex-col leading-none">
-              <span className="font-sans font-black text-lg tracking-tight text-foreground uppercase">
-                Juarez <span className="text-primary">Bravo</span>
-              </span>
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Noticias de Ciudad Juárez
-              </span>
-            </div>
-          </Link>
-
-          {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            <Link
-              to="/"
-              className={`px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
-                location.pathname === "/"
-                  ? "text-brand-teal border-b-2 border-brand-teal"
-                  : "text-foreground hover:text-brand-teal"
-              }`}
-            >
-              Inicio
-            </Link>
-            {CATEGORIES.map((cat) => (
-              <Link
-                key={cat.slug}
-                to={`/categoria/${cat.slug}`}
-                className={`px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
-                  isActive(`/categoria/${cat.slug}`)
-                    ? "text-brand-teal border-b-2 border-brand-teal"
-                    : "text-foreground hover:text-brand-teal"
-                }`}
-              >
-                {cat.name}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <Link
-              to="/buscar"
-              className="hidden sm:flex p-2 text-foreground hover:text-brand-teal"
-              aria-label="Buscar"
-            >
-              <Search className="w-5 h-5" />
-            </Link>
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden p-2 text-foreground"
-              aria-label="Menú"
-            >
-              {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
+    <>
+      <div className="bg-foreground text-background">
+        <div className="site-container flex min-h-9 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2 text-[10px] font-bold uppercase tracking-[0.12em] sm:text-xs">
+          <span className="inline-flex items-center gap-2">
+            <span className="size-1.5 rounded-full bg-brand-red" />
+            Ciudad Juárez, Chih.
+          </span>
+          <span className="text-background/75">
+            <span className="sm:hidden">{shortEditionDate.format(today)}</span>
+            <span className="hidden sm:inline">{editionDate.format(today)}</span>
+          </span>
         </div>
-
-        {/* Mobile menu */}
-        {mobileOpen && (
-          <nav className="lg:hidden border-t border-border py-2">
-            <Link
-              to="/"
-              onClick={() => setMobileOpen(false)}
-              className="block px-3 py-2 text-sm font-medium uppercase tracking-wide hover:bg-secondary"
-            >
-              Inicio
-            </Link>
-            {CATEGORIES.map((cat) => (
-              <Link
-                key={cat.slug}
-                to={`/categoria/${cat.slug}`}
-                onClick={() => setMobileOpen(false)}
-                className="block px-3 py-2 text-sm font-medium uppercase tracking-wide hover:bg-secondary"
-              >
-                {cat.name}
-              </Link>
-            ))}
-            <Link
-              to="/buscar"
-              onClick={() => setMobileOpen(false)}
-              className="block px-3 py-2 text-sm font-medium uppercase tracking-wide hover:bg-secondary"
-            >
-              Buscar
-            </Link>
-          </nav>
-        )}
       </div>
-    </header>
+
+      <header
+        className="sticky top-0 z-40 border-b border-border bg-card"
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && mobileOpen) {
+            closeMenu();
+            document.getElementById("menu-button")?.focus();
+          }
+        }}
+      >
+        <div className="site-container">
+          <div className="flex min-h-[72px] items-center justify-between gap-4 sm:min-h-[88px]">
+            <Link to="/" onClick={closeMenu} className="flex shrink-0 items-center gap-2.5 sm:gap-3">
+              <img src="/logo-mark.png" alt="" width="60" height="60" className="size-11 sm:size-[60px]" />
+              <span className="font-display text-[26px] uppercase leading-none sm:text-[32px]">
+                Juárez <span className="text-primary">Bravo</span>
+              </span>
+            </Link>
+
+            <nav aria-label="Secciones" className="hidden self-stretch lg:flex lg:gap-5 xl:gap-8">
+              {sections.map(({ to, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === "/"}
+                  className="flex items-center border-b-[3px] border-transparent pt-[3px] text-[13px] font-bold transition-colors hover:text-primary aria-[current=page]:border-primary aria-[current=page]:text-primary"
+                >
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <NavLink
+                to="/buscar"
+                onClick={closeMenu}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 border border-border text-sm font-semibold transition-colors hover:border-primary hover:text-primary aria-[current=page]:border-primary aria-[current=page]:text-primary sm:px-4"
+                aria-label="Buscar noticias"
+              >
+                <Search size={17} aria-hidden="true" />
+                <span className="hidden sm:inline">Buscar</span>
+              </NavLink>
+              <button
+                id="menu-button"
+                type="button"
+                onClick={() => setOpenMenuKey(mobileOpen ? null : location.key)}
+                className="inline-flex size-11 items-center justify-center border border-border hover:text-primary lg:hidden"
+                aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+                aria-expanded={mobileOpen}
+                aria-controls="site-mobile-navigation"
+              >
+                {mobileOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+              </button>
+            </div>
+          </div>
+
+          <nav
+            id="site-mobile-navigation"
+            aria-label="Secciones"
+            hidden={!mobileOpen}
+            className="border-t border-border py-2 lg:hidden"
+          >
+            {sections.map(({ to, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === "/"}
+                onClick={closeMenu}
+                className="block px-3 py-3 text-sm font-semibold hover:bg-secondary aria-[current=page]:bg-secondary aria-[current=page]:text-primary"
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+      </header>
+    </>
   );
 }
