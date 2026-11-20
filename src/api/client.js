@@ -42,29 +42,6 @@ function articlePage(path, filters, signal) {
   return request('GET', `${path}?${params}`, undefined, signal);
 }
 
-function makeEntityClient(basePath) {
-  return {
-    list(sort, limit) {
-      const p = new URLSearchParams();
-      if (sort)  p.set('sort', sort);
-      if (limit) p.set('limit', String(limit));
-      return request('GET', `${basePath}?${p}`);
-    },
-    filter(filters, sort, limit) {
-      const p = new URLSearchParams();
-      for (const [k, v] of Object.entries(filters || {})) {
-        if (v !== undefined && v !== null) p.set(k, String(v));
-      }
-      if (sort)  p.set('sort', sort);
-      if (limit) p.set('limit', String(limit));
-      return request('GET', `${basePath}?${p}`);
-    },
-    create(data) { return request('POST', basePath, data); },
-    update(id, data) { return request('PATCH', `${basePath}/${id}`, data); },
-    delete(id) { return request('DELETE', `${basePath}/${id}`); },
-  };
-}
-
 export const api = {
   articles: {
     create(data) { return request('POST', '/articles', data); },
@@ -79,7 +56,14 @@ export const api = {
     tags(signal) { return request('GET', '/admin/articles/tags', undefined, signal); },
     view(id) { return request('POST', `/articles/${id}/view`); },
   },
-  ticker: makeEntityClient('/ticker'),
+  ticker: {
+    visible(limit, signal) { return request('GET', `/ticker?limit=${limit}`, undefined, signal); },
+    adminList(signal) { return request('GET', '/ticker/admin', undefined, signal); },
+    create(data) { return request('POST', '/ticker', data); },
+    update(id, data) { return request('PATCH', `/ticker/${encodeURIComponent(id)}`, data); },
+    move(id, direction) { return request('POST', `/ticker/${encodeURIComponent(id)}/move`, { direction }); },
+    delete(id) { return request('DELETE', `/ticker/${encodeURIComponent(id)}`); },
+  },
 
   auth: {
     login(username, password) {

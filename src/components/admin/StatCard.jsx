@@ -1,25 +1,18 @@
 import React from "react";
 
+/** @param {{label: string, value: string|number, icon: import('lucide-react').LucideIcon, accent?: boolean}} props */
 export default function StatCard({ label, value, icon: Icon, accent = false }) {
   return (
-    <div className="bg-white border border-border p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-widest text-muted-foreground">
-            {label}
-          </div>
-          <div className="font-serif font-bold text-3xl mt-2">{value}</div>
+    <div className="admin-panel flex min-w-0 flex-wrap items-start justify-between gap-2 p-4 sm:p-5">
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-muted-foreground sm:text-sm">{label}</div>
+        <div className="mt-1 break-all font-serif text-2xl font-bold tabular-nums sm:text-3xl">
+          {typeof value === "number" ? value.toLocaleString("es-MX") : value}
         </div>
-        {Icon && (
-          <div
-            className={`w-10 h-10 flex items-center justify-center ${
-              accent ? "bg-primary text-white" : "bg-secondary text-foreground"
-            }`}
-          >
-            <Icon className="w-5 h-5" />
-          </div>
-        )}
       </div>
+      <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${accent ? "bg-primary/10 text-primary" : "bg-background text-foreground"}`}>
+        <Icon size={17} aria-hidden="true" />
+      </span>
     </div>
   );
 }

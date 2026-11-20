@@ -24,6 +24,8 @@ export function buildArticleQuery(query = {}, admin = false) {
   const add = (sql, value) => { conditions.push(sql); params.push(value); };
   if (!admin) add('status = ?', 'published');
   else if (['published', 'draft'].includes(query.status)) add('status = ?', query.status);
+  if (admin && query.placement === 'breaking') conditions.push('is_breaking_news = 1');
+  if (admin && query.placement === 'featured') conditions.push("is_featured = 1 AND (featured_until IS NULL OR featured_until > UTC_TIMESTAMP())");
   for (const field of ['category', 'slug', 'id']) {
     if (typeof query[field] === 'string' && query[field]) add(`${field} = ?`, query[field]);
   }
@@ -66,7 +68,7 @@ export async function getHomeArticles() {
   const [recent, hero, ...categories] = await Promise.all([
     db.query(`SELECT ${SUMMARY_COLUMNS} FROM articles WHERE status = 'published' ORDER BY published_at DESC, id DESC LIMIT 27`),
     db.query(`SELECT ${SUMMARY_COLUMNS} FROM articles WHERE status = 'published' AND is_featured = 1
-      AND (featured_until IS NULL OR featured_until > NOW()) ORDER BY published_at DESC, id DESC LIMIT 1`),
+      AND (featured_until IS NULL OR featured_until > UTC_TIMESTAMP()) ORDER BY published_at DESC, id DESC LIMIT 1`),
     ...HOME_CATEGORIES.map(category => db.query(
       `SELECT ${SUMMARY_COLUMNS} FROM articles WHERE status = 'published' AND category = ? ORDER BY published_at DESC, id DESC LIMIT 5`, [category]
     )),

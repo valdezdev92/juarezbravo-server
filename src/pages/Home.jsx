@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { ArrowUpRight } from "lucide-react";
@@ -45,11 +45,26 @@ export default function Home() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: articleKeys.home,
     queryFn: ({ signal }) => api.articles.home(signal),
+    refetchOnWindowFocus: true,
   });
   const articles = data?.articles || [];
   const categories = data?.categories || {};
 
   const featured = pickHero(articles);
+  const expiry = featured?.is_featured ? featured.featured_until : null;
+  useEffect(() => {
+    if (!expiry) return;
+    const expiresAt = Date.parse(expiry);
+    if (!Number.isFinite(expiresAt)) return;
+    let timer;
+    const schedule = () => {
+      const delay = expiresAt - Date.now();
+      if (delay <= 0) void refetch();
+      else timer = window.setTimeout(schedule, Math.min(delay, 2_147_483_647));
+    };
+    if (expiresAt > Date.now()) schedule();
+    return () => window.clearTimeout(timer);
+  }, [expiry, refetch]);
   const remaining = articles.filter((article) => article.id !== featured?.id);
   const breaking = remaining.slice(0, 4);
   const pool = remaining.slice(4);

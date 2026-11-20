@@ -1,160 +1,130 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, Image, Megaphone, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { api } from "@/api/client";
-import { CATEGORIES, getCategoryName, formatDateTime } from "@/lib/categories";
-import { Edit, Trash2, ExternalLink, Search, PlusCircle } from "lucide-react";
+import { EDITORIAL_CATEGORIES, getCategoryName, formatDateTime } from "@/lib/categories";
 import { articleKeys, invalidateArticles } from "@/lib/article-queries";
+import { tickerKeys } from "@/lib/ticker";
 import { useDebounce } from "@/hooks/use-debounce";
+import { Button } from "@/components/ui/button";
 import PaginationControls from "@/components/PaginationControls";
 
 export default function AdminArticles() {
   const queryClient = useQueryClient();
-  const [search, setSearch]           = useState("");
-  const [statusFilter, setStatus]     = useState("all");
-  const [categoryFilter, setCategory] = useState("all");
-  const [page, setPage] = useState(1);
-  const debouncedSearch = useDebounce(search, 400).trim();
-  const filters = {
-    page, limit: 25, search: debouncedSearch,
-    status: statusFilter === 'all' ? undefined : statusFilter,
-    category: categoryFilter === 'all' ? undefined : categoryFilter,
-  };
+  const [params, setParams] = useSearchParams();
+  const search = params.get("buscar") || "";
+  const status = params.get("estado") || "";
+  const category = params.get("categoria") || "";
+  const placement = params.get("visibilidad") || "";
+  const sort = params.get("orden") || "-created_at";
+  const tag = params.get("etiqueta") || "";
+  const requestedPage = Number(params.get("pagina"));
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const debouncedSearch = useDebounce(search, 350).trim();
+  const filters = { page, limit: 25, search: debouncedSearch, status, category, placement, sort, tag };
+
+  function changeFilter(key, value) {
+    const next = new URLSearchParams(params);
+    if (key !== "pagina") next.delete("pagina");
+    if (value) next.set(key, String(value));
+    else next.delete(key);
+    setParams(next, { replace: key === "buscar" });
+  }
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: articleKeys.adminList(filters),
     queryFn: ({ signal }) => api.articles.adminPage(filters, signal),
   });
   const articles = data?.items || [];
-
   const deleteMutation = useMutation({
     mutationFn: (id) => api.articles.delete(id),
     onSuccess: async () => {
-      if (articles.length === 1 && page > 1) setPage(page - 1);
-      await invalidateArticles(queryClient);
+      if (articles.length === 1 && page > 1) changeFilter("pagina", page - 1);
+      await Promise.all([
+        invalidateArticles(queryClient),
+        queryClient.invalidateQueries({ queryKey: tickerKeys.all }),
+      ]);
     },
   });
 
-  const handleDelete = (id, title) => {
-    if (window.confirm(`¿Eliminar "${title}"? Esta acción no se puede deshacer.`)) {
-      deleteMutation.mutate(id);
-    }
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <h1 className="font-serif font-bold text-3xl">Artículos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {data?.total ?? 0} artículo{data?.total !== 1 ? "s" : ""} con estos filtros
-          </p>
-        </div>
-        <Link
-          to="/admin/articulos/nuevo"
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold uppercase tracking-wide hover:bg-primary/90"
-        >
-          <PlusCircle className="w-4 h-4" />
-          Nueva Noticia
-        </Link>
+      <div className="admin-page-heading">
+        <div><h1>Noticias</h1><p>Busca, edita y organiza el archivo editorial.</p></div>
+        <Button asChild><Link to="/admin/articulos/nuevo"><Plus size={17} /> Nueva noticia</Link></Button>
       </div>
 
-      <div className="bg-white border border-border p-4 grid sm:grid-cols-3 gap-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar noticias..."
-            aria-label="Buscar noticias"
-            className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border outline-none focus:border-primary"
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-          className="px-3 py-2 text-sm bg-background border border-border outline-none focus:border-primary"
-        >
-          <option value="all">Todos los estados</option>
-          <option value="published">Publicados</option>
-          <option value="draft">Borradores</option>
-        </select>
-        <select
-          value={categoryFilter}
-          onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-          className="px-3 py-2 text-sm bg-background border border-border outline-none focus:border-primary"
-        >
-          <option value="all">Todas las categorías</option>
-          {CATEGORIES.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-        </select>
-      </div>
-
-      <div className="bg-white border border-border overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary text-xs uppercase tracking-wider">
-            <tr className="text-left">
-              <th className="px-4 py-3">Título</th>
-              <th className="px-4 py-3 hidden md:table-cell">Categoría</th>
-              <th className="px-4 py-3 hidden md:table-cell">Estado</th>
-              <th className="px-4 py-3 hidden lg:table-cell">Fecha</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {isLoading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Cargando...</td></tr>
-            ) : isError ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center">No pudimos cargar los artículos. <button type="button" onClick={() => refetch()} className="text-primary underline">Reintentar</button></td></tr>
-            ) : articles.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No hay artículos que coincidan.</td></tr>
-            ) : (
-              articles.map((a) => (
-                <tr key={a.id} className="hover:bg-secondary/40">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      {a.is_breaking_news && <span className="text-[10px] px-1.5 py-0.5 bg-primary text-white font-bold uppercase">Urgente</span>}
-                      {a.is_featured && <span className="text-[10px] px-1.5 py-0.5 bg-foreground text-white font-bold uppercase">Hero</span>}
-                    </div>
-                    <div className="font-serif font-semibold">{a.title || "(Sin título)"}</div>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    {a.category ? (
-                      <span className="text-xs font-bold uppercase tracking-wider text-primary">{getCategoryName(a.category)}</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <span className={`text-[10px] px-2 py-0.5 font-bold uppercase tracking-widest ${a.status === "published" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
-                      {a.status === "published" ? "Publicado" : "Borrador"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
-                    {formatDateTime(a.published_at || a.created_date)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      {a.status === "published" && a.slug && (
-                        <Link to={`/noticias/${a.slug}`} target="_blank" className="p-2 hover:text-primary" title="Ver">
-                          <ExternalLink className="w-4 h-4" />
-                        </Link>
-                      )}
-                      <Link to={`/admin/articulos/${a.id}/editar`} className="p-2 hover:text-primary" title="Editar">
-                        <Edit className="w-4 h-4" />
-                      </Link>
-                      <button disabled={deleteMutation.isPending} onClick={() => handleDelete(a.id, a.title)} className="p-2 hover:text-primary disabled:opacity-50" title="Eliminar">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+      <section className="admin-panel" aria-labelledby="archive-heading">
+        <div className="space-y-3 border-b p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="archive-heading" className="text-lg font-semibold">Archivo <span className="ml-1 text-sm font-normal text-muted-foreground">{data ? data.total.toLocaleString("es-MX") : ""}</span></h2>
+            {(search || status || category || placement || tag || sort !== "-created_at") && (
+              <Button variant="ghost" size="sm" onClick={() => setParams({})}><X size={15} /> Limpiar filtros</Button>
             )}
-          </tbody>
-        </table>
-      </div>
-      {deleteMutation.isError && <p role="alert" className="text-primary">No se pudo eliminar la noticia. Inténtalo de nuevo.</p>}
-      <PaginationControls page={page} hasMore={data?.hasMore ?? false} onChange={setPage} disabled={isFetching} />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(10rem,1.6fr)_repeat(4,minmax(0,1fr))]">
+            <label className="relative sm:col-span-2 xl:col-span-1">
+              <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+              <input value={search} onChange={(e) => changeFilter("buscar", e.target.value)} placeholder="Buscar noticias" aria-label="Buscar noticias" className="admin-input pl-9" />
+            </label>
+            <select value={status} onChange={(e) => changeFilter("estado", e.target.value)} aria-label="Estado de publicación" className="admin-input">
+              <option value="">Todos los estados</option><option value="published">Publicadas</option><option value="draft">Borradores</option>
+            </select>
+            <select value={category} onChange={(e) => changeFilter("categoria", e.target.value)} aria-label="Categoría" className="admin-input">
+              <option value="">Todas las categorías</option>
+              {EDITORIAL_CATEGORIES.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+            </select>
+            <select value={placement} onChange={(e) => changeFilter("visibilidad", e.target.value)} aria-label="Visibilidad editorial" className="admin-input">
+              <option value="">Toda la visibilidad</option><option value="featured">Marcadas para portada</option><option value="breaking">Marcadas como urgentes</option>
+            </select>
+            <select value={sort} onChange={(e) => changeFilter("orden", e.target.value)} aria-label="Ordenar noticias" className="admin-input">
+              <option value="-created_at">Más recientes</option><option value="created_at">Más antiguas</option><option value="-views">Más vistas</option><option value="title">Título de A a Z</option>
+            </select>
+          </div>
+          {tag && <Button variant="secondary" size="sm" onClick={() => changeFilter("etiqueta", "")} aria-label={`Quitar filtro por etiqueta ${tag}`}>#{tag} <X size={14} /></Button>}
+        </div>
+
+        {isLoading ? <p role="status" className="p-6 text-center text-sm text-muted-foreground">Cargando noticias…</p>
+          : isError ? <p role="alert" className="p-6 text-center text-sm">No se pudieron cargar las noticias. <button type="button" onClick={() => refetch()} className="text-primary underline">Reintentar</button></p>
+            : !articles.length ? <p className="p-6 text-center text-sm text-muted-foreground">No hay noticias con estos filtros.</p>
+              : (
+                <ul className="divide-y">
+                  {articles.map(article => (
+                    <li key={article.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 hover:bg-secondary/25 sm:flex-nowrap sm:px-5">
+                      <div className="relative grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-md bg-background text-muted-foreground" aria-hidden="true">
+                        <Image size={16} />
+                        {article.cover_image && <img loading="lazy" src={article.cover_image} alt="" className="absolute inset-0 size-full object-cover" onError={(e) => { e.currentTarget.hidden = true; }} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className={`rounded-full px-2 py-0.5 font-semibold ${article.status === "published" ? "bg-emerald-50 text-emerald-800" : "bg-secondary"}`}>{article.status === "published" ? "Publicada" : "Borrador"}</span>
+                          {article.category && <span>{getCategoryName(article.category)}</span>}
+                          {article.is_breaking_news && <span className="font-semibold text-primary">Urgente</span>}
+                          {article.is_featured && (!article.featured_until || Date.parse(article.featured_until) > Date.now()) && <span className="font-semibold">Destacada</span>}
+                        </div>
+                        <Link to={`/admin/articulos/${article.id}/editar`} className="block break-words text-sm font-semibold hover:text-primary">{article.title || "(Sin título)"}</Link>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(article.published_at || article.created_date)}</p>
+                      </div>
+                      <div className="flex w-full flex-wrap justify-end gap-1 pl-10 sm:w-auto sm:pl-0">
+                        {article.status === "published" && article.slug && (
+                          <>
+                            <Button asChild variant="ghost" size="icon"><Link to={`/admin/ticker?articulo=${encodeURIComponent(article.id)}`} title="Enviar a Última hora" aria-label={`Enviar ${article.title} a Última hora`}><Megaphone size={16} /></Link></Button>
+                            <Button asChild variant="ghost" size="icon"><Link to={`/noticias/${encodeURIComponent(article.slug)}`} target="_blank" rel="noopener" title="Ver publicación" aria-label={`Ver ${article.title}`}><ExternalLink size={16} /></Link></Button>
+                          </>
+                        )}
+                        <Button asChild variant="ghost" size="icon"><Link to={`/admin/articulos/${article.id}/editar`} title="Editar" aria-label={`Editar ${article.title}`}><Pencil size={16} /></Link></Button>
+                        <Button type="button" variant="ghost" size="icon" disabled={deleteMutation.isPending} title="Eliminar" aria-label={`Eliminar ${article.title}`} onClick={() => {
+                          if (window.confirm(`¿Eliminar «${article.title}»? Esta acción es definitiva.`)) deleteMutation.mutate(article.id);
+                        }}><Trash2 size={16} /></Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+      </section>
+      {deleteMutation.isError && <p role="alert" className="text-sm text-primary">No se pudo eliminar la noticia. Inténtalo de nuevo.</p>}
+      {(data?.hasMore || page > 1) && <PaginationControls page={page} hasMore={data?.hasMore ?? false} onChange={(next) => changeFilter("pagina", next)} disabled={isFetching} />}
     </div>
   );
 }

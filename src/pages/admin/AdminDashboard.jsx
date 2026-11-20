@@ -1,113 +1,101 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Newspaper, FileEdit, Eye, ExternalLink, Pencil, ArrowRight, Plus, Radio } from "lucide-react";
 import { api } from "@/api/client";
 import StatCard from "@/components/admin/StatCard";
-import { Newspaper, FileEdit, Megaphone, Eye, ExternalLink, Edit } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getCategoryName, formatRelativeTime } from "@/lib/categories";
 import { articleKeys } from "@/lib/article-queries";
+import { useScheduleClock } from "@/hooks/use-schedule-clock";
+import { formatScheduleDate, visibleTickerQuery } from "@/lib/ticker";
 
 export default function AdminDashboard() {
   const { data: stats, isLoading, isError, refetch } = useQuery({
     queryKey: articleKeys.stats,
     queryFn: ({ signal }) => api.articles.stats(signal),
   });
-
-  const { data: ticker = [] } = useQuery({
-    queryKey: ["admin", "ticker"],
-    queryFn: () => api.ticker.list("order", 50),
-  });
-
+  const ticker = useQuery(visibleTickerQuery);
+  const items = ticker.data || [];
+  const now = useScheduleClock(items);
+  const live = items.filter(item => !item.ends_at || Date.parse(item.ends_at) > now);
   const recent = stats?.recent || [];
-  if (isLoading) return <p role="status">Cargando resumen…</p>;
-  if (isError) return <p role="alert">No pudimos cargar el resumen. <button type="button" onClick={() => refetch()} className="text-primary underline">Reintentar</button></p>;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-end justify-between border-b border-border pb-4">
+    <div className="space-y-6">
+      <div className="admin-page-heading">
         <div>
-          <h1 className="font-serif font-bold text-3xl">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Resumen general del sitio editorial</p>
+          <h1>Resumen editorial</h1>
+          <p>Revisa tus publicaciones y los titulares de la cabecera.</p>
         </div>
-        <Link
-          to="/admin/articulos/nuevo"
-          className="hidden sm:inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold uppercase tracking-wide hover:bg-primary/90"
-        >
-          + Nueva Noticia
-        </Link>
+        <Button asChild><Link to="/admin/articulos/nuevo"><Plus size={17} /> Nueva noticia</Link></Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Publicadas"     value={stats.published}  icon={Newspaper} accent />
-        <StatCard label="Borradores"     value={stats.drafts}     icon={FileEdit} />
-        <StatCard label="Urgentes"       value={stats.breaking}   icon={Megaphone} />
-        <StatCard label="Vistas Totales" value={stats.totalViews} icon={Eye} />
+      {isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando resumen…</p>}
+      {isError && <p role="alert" className="text-sm text-primary">No se pudo cargar el resumen. <button type="button" onClick={() => refetch()} className="underline">Reintentar</button></p>}
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="Noticias publicadas" value={stats?.published ?? "—"} icon={Newspaper} />
+        <StatCard label="Borradores" value={stats?.drafts ?? "—"} icon={FileEdit} />
+        <StatCard label="Vistas totales" value={stats?.totalViews ?? "—"} icon={Eye} />
+        <StatCard label="Titulares en cabecera" value={ticker.data && !ticker.isError ? live.length : "—"} icon={Radio} accent />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white border border-border">
-          <div className="flex items-center justify-between border-b border-border px-5 py-3">
-            <h2 className="font-serif font-bold uppercase text-sm tracking-wider">Últimos Artículos</h2>
-            <Link to="/admin/articulos" className="text-xs text-primary uppercase tracking-widest font-semibold hover:underline">
-              Ver todos →
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+        <section className="admin-panel" aria-labelledby="recent-news">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-4 sm:px-5">
+            <h2 id="recent-news" className="text-lg font-semibold">Noticias recientes</h2>
+            <Link to="/admin/articulos" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
+              Ver todas <ArrowRight size={14} />
             </Link>
           </div>
-          {recent.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              Aún no has creado artículos.{" "}
-              <Link to="/admin/articulos/nuevo" className="text-primary underline">Crear el primero</Link>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {recent.map((a) => (
-                <div key={a.id} className="px-5 py-3 flex items-center gap-3 hover:bg-secondary/40">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[10px] px-2 py-0.5 font-bold uppercase tracking-widest ${a.status === "published" ? "bg-primary text-white" : "bg-secondary text-muted-foreground"}`}>
-                        {a.status === "published" ? "Publicado" : "Borrador"}
+          {stats && (recent.length ? (
+            <ul className="divide-y">
+              {recent.map((article) => (
+                <li key={article.id} className="flex items-center gap-2 px-4 py-3 hover:bg-secondary/25 sm:px-5">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <span className={`rounded-full px-2 py-0.5 font-semibold ${article.status === "published" ? "bg-emerald-50 text-emerald-800" : "bg-secondary"}`}>
+                        {article.status === "published" ? "Publicada" : "Borrador"}
                       </span>
-                      {a.is_breaking_news && (
-                        <span className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-widest bg-foreground text-white">Urgente</span>
-                      )}
-                      {a.category && (
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary">{getCategoryName(a.category)}</span>
-                      )}
+                      {article.category && <span>{getCategoryName(article.category)}</span>}
+                      <span>{formatRelativeTime(article.created_date)}</span>
                     </div>
-                    <div className="font-serif font-semibold text-sm truncate">{a.title || "(Sin título)"}</div>
-                    <div className="text-xs text-muted-foreground">{formatRelativeTime(a.created_date)}</div>
+                    <Link to={`/admin/articulos/${article.id}/editar`} className="block break-words text-sm font-semibold hover:text-primary">{article.title || "(Sin título)"}</Link>
                   </div>
-                  <Link to={`/admin/articulos/${a.id}/editar`} className="p-2 text-muted-foreground hover:text-primary" title="Editar">
-                    <Edit className="w-4 h-4" />
-                  </Link>
-                  {a.status === "published" && a.slug && (
-                    <Link to={`/noticias/${a.slug}`} target="_blank" className="p-2 text-muted-foreground hover:text-primary" title="Ver en el sitio">
-                      <ExternalLink className="w-4 h-4" />
-                    </Link>
+                  <Button asChild variant="ghost" size="icon"><Link to={`/admin/articulos/${article.id}/editar`} aria-label={`Editar ${article.title}`}><Pencil size={16} /></Link></Button>
+                  {article.status === "published" && article.slug && (
+                    <Button asChild variant="ghost" size="icon"><Link to={`/noticias/${encodeURIComponent(article.slug)}`} target="_blank" rel="noopener" aria-label={`Ver ${article.title}`}><ExternalLink size={16} /></Link></Button>
                   )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white border border-border">
-          <div className="flex items-center justify-between border-b border-border px-5 py-3">
-            <h2 className="font-serif font-bold uppercase text-sm tracking-wider">Ticker Urgente</h2>
-            <Link to="/admin/ticker" className="text-xs text-primary uppercase tracking-widest font-semibold hover:underline">Gestionar</Link>
-          </div>
-          {ticker.filter((t) => t.is_active).length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">No hay titulares activos en el ticker.</div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {ticker.filter((t) => t.is_active).slice(0, 6).map((t) => (
-                <li key={t.id} className="px-5 py-3 text-sm">
-                  <span className="inline-block w-1.5 h-1.5 bg-primary mr-2 align-middle" />
-                  {t.headline}
                 </li>
               ))}
             </ul>
-          )}
-        </div>
+          ) : <p className="p-5 text-sm text-muted-foreground">Aún no hay noticias en el archivo.</p>)}
+        </section>
+
+        <section className="admin-panel" aria-labelledby="live-headlines">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-4 sm:px-5">
+            <h2 id="live-headlines" className="text-lg font-semibold">Última hora</h2>
+            <Link to="/admin/ticker" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
+              Administrar <ArrowRight size={14} />
+            </Link>
+          </div>
+          {ticker.isLoading ? <p role="status" className="p-5 text-sm text-muted-foreground">Cargando titulares…</p>
+            : ticker.isError ? <p role="alert" className="p-5 text-sm">No se pudieron cargar los titulares. <button type="button" onClick={() => ticker.refetch()} className="text-primary underline">Reintentar</button></p>
+              : live.length ? (
+                <ul className="divide-y">
+                  {live.slice(0, 6).map((item) => (
+                    <li key={item.id} className="flex gap-3 px-4 py-3 sm:px-5">
+                      <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-600" aria-hidden="true" />
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold">{item.headline}</p>
+                        <p className="text-xs text-muted-foreground">{item.ends_at ? `Hasta ${formatScheduleDate(item.ends_at)}` : "Sin vencimiento"}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="p-5 text-sm text-muted-foreground">La cabecera está sin titulares visibles.</p>}
+        </section>
       </div>
     </div>
   );

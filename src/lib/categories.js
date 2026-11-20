@@ -6,8 +6,10 @@ export const CATEGORIES = [
   { slug: "entretenimiento", name: "Entretenimiento" },
 ];
 
+export const EDITORIAL_CATEGORIES = [...CATEGORIES, { slug: "sociedad", name: "Sociedad" }];
+
 export const getCategoryName = (slug) => {
-  const cat = CATEGORIES.find((c) => c.slug === slug);
+  const cat = EDITORIAL_CATEGORIES.find((c) => c.slug === slug);
   return cat ? cat.name : slug;
 };
 

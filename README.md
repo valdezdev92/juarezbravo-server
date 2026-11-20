@@ -107,3 +107,12 @@ se descargan únicamente al entrar en esa ruta.
 
 Las pruebas de API usan MySQL simulado; no sustituyen la aplicación de la migración ni `EXPLAIN`
 en la base real. Las pruebas de imágenes sí generan y verifican WebP con `sharp`.
+
+## Panel editorial y cabecera de Última hora
+
+1. Aplicar [006_ticker_schedule.sql](server/migrations/006_ticker_schedule.sql) una vez en la base de datos, después de las migraciones 001–005 y antes de reiniciar el nuevo backend.
+2. Desplegar el backend y `dist/` juntos. Verificar `/admin/ticker` con una cuenta editorial y la banda de Última hora del sitio público.
+
+El panel permite habilitar, pausar y ordenar titulares. El inicio vacío permite que el titular aparezca al habilitarlo. El fin vacío lo mantiene sin vencimiento. Se pueden elegir fechas o aplicar atajos de 1, 6 y 24 horas. El formulario usa la zona horaria del dispositivo y la base guarda UTC. Las entradas existentes conservan su orden y estado, con vigencia indefinida.
+
+La cabecera muestra hasta 30 titulares en orden. Una página pública abierta consulta el servidor cada 15 segundos y retira los titulares cargados al llegar su hora de fin. Cuando un titular se enlaza desde el selector de noticias, sigue la URL de esa publicación y se oculta si se retira o elimina la noticia. En el editor de noticias, «Mostrar hasta» controla el vencimiento del destaque en portada.

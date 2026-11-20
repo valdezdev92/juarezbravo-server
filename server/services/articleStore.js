@@ -22,7 +22,7 @@ export function parseRow(row) {
 export async function createArticle(data) {
   const {
     title, slug, excerpt, body, cover_image, category, tags,
-    is_breaking_news, is_featured, author, published_at, views,
+    is_breaking_news, is_featured, featured_until, author, published_at, views,
   } = data;
 
   let status = data.status || 'draft';
@@ -39,8 +39,8 @@ export async function createArticle(data) {
   await db.query(
     `INSERT INTO articles
        (id, title, slug, excerpt, body, cover_image, category, tags,
-        status, is_breaking_news, is_featured, author, published_at, views)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        status, is_breaking_news, is_featured, featured_until, author, published_at, views)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, title, slug || null, excerpt || null, body || null,
       cover_image || null, category || null,
@@ -48,8 +48,9 @@ export async function createArticle(data) {
       status,
       is_breaking_news ? 1 : 0,
       is_featured      ? 1 : 0,
+      is_featured ? featured_until ?? null : null,
       author || null,
-      published_at || null,
+      published_at ? new Date(published_at) : null,
       views || 0,
     ]
   );
@@ -125,7 +126,7 @@ export async function clearExpiredHeroes() {
         SET is_featured = 0, featured_until = NULL
       WHERE is_featured = 1
         AND featured_until IS NOT NULL
-        AND featured_until <= NOW()`
+        AND featured_until <= UTC_TIMESTAMP()`
   );
   return result.affectedRows;
 }

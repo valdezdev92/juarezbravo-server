@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import db from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { createArticle, parseRow } from '../services/articleStore.js';
@@ -7,6 +8,17 @@ import { publishArticleOnSocialMedia } from '../services/socialPost.js';
 import { getHomeArticles, listArticles } from '../services/articleQueries.js';
 
 const router = Router();
+const expiry = z.string().datetime().nullable();
+function validateFeaturedUntil(req, res, next) {
+  if (req.body?.featured_until !== undefined) {
+    const parsed = expiry.safeParse(req.body.featured_until);
+    if (!parsed.success || (parsed.data && Number(parsed.data.slice(0, 4)) < 1000)) {
+      return res.status(400).json({ error: 'La fecha de fin del destacado no es válida.' });
+    }
+    req.body.featured_until = parsed.data && new Date(parsed.data);
+  }
+  next();
+}
 
 // GET /api/articles
 router.get('/', async (req, res) => {
@@ -44,7 +56,7 @@ router.post('/:id/view', async (req, res) => {
 });
 
 // POST /api/articles
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, validateFeaturedUntil, async (req, res) => {
   try {
     const article = await createArticle(req.body);
     res.status(201).json(article);
@@ -55,12 +67,12 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // PATCH /api/articles/:id
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, validateFeaturedUntil, async (req, res) => {
   try {
     const { id } = req.params;
     const FIELDS  = [
       'title','slug','excerpt','body','cover_image','category','tags',
-      'status','is_breaking_news','is_featured','author','published_at','views',
+      'status','is_breaking_news','is_featured','featured_until','author','published_at','views',
     ];
 
     // Igual que al crear: no se permite dejar publicada una nota sin imagen
@@ -85,6 +97,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       if (field === 'tags')                            params.push(JSON.stringify(req.body[field] || []));
       else if (field === 'is_breaking_news' || field === 'is_featured')
                                                        params.push(req.body[field] ? 1 : 0);
+      else if (field === 'published_at')               params.push(req.body[field] ? new Date(req.body[field]) : null);
       else                                             params.push(req.body[field] ?? null);
     }
 

@@ -91,6 +91,27 @@
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
 
+  .admin-panel {
+    @apply rounded-xl border border-border bg-white;
+  }
+
+  .admin-page-heading {
+    @apply flex flex-wrap items-end justify-between gap-4;
+  }
+
+  .admin-page-heading h1 {
+    @apply text-3xl font-bold sm:text-4xl;
+  }
+
+  .admin-page-heading p {
+    @apply mt-1.5 text-sm text-muted-foreground;
+  }
+
+  .admin-input {
+    @apply h-9 w-full rounded-md border border-input bg-white px-3 text-sm font-normal
+      text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30;
+  }
+
   .ticker-viewport {
     container-type: inline-size;
   }
